@@ -165,10 +165,7 @@ fn log_desktop_event(event: &str, detail: impl AsRef<str>) {
         return;
     }
     let (iso_timestamp, unix_millis) = utc_timestamp_parts();
-    let _guard = LOG_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .ok();
+    let _guard = LOG_LOCK.get_or_init(|| Mutex::new(())).lock().ok();
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
@@ -277,23 +274,23 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         );
     }
     set_env_value(&root_env, "COMPOSE_PROJECT_NAME", "hypersearch")?;
-    set_env_value(
+    set_env_default(
         &root_env,
         "HYPERSEARCH_API_IMAGE",
         "ghcr.io/nacsez/hypersearch-api:1.0.0",
     )?;
-    set_env_value(
+    set_env_default(
         &root_env,
         "HYPERSEARCH_UI_IMAGE",
         "ghcr.io/nacsez/hypersearch-ui:1.0.0",
     )?;
     set_env_value(&compose_env, "COMPOSE_PROJECT_NAME", "hypersearch")?;
-    set_env_value(
+    set_env_default(
         &compose_env,
         "HYPERSEARCH_API_IMAGE",
         "ghcr.io/nacsez/hypersearch-api:1.0.0",
     )?;
-    set_env_value(
+    set_env_default(
         &compose_env,
         "HYPERSEARCH_UI_IMAGE",
         "ghcr.io/nacsez/hypersearch-ui:1.0.0",
@@ -495,12 +492,84 @@ fn run_compose(args: &[&str]) -> Result<String, String> {
     let compose_dir = root.join("infra").join("docker");
     let mut command = hidden_command("docker");
     command
-        .args(["compose", "--ansi", "never", "--project-name", "hypersearch"])
+        .args([
+            "compose",
+            "--ansi",
+            "never",
+            "--project-name",
+            "hypersearch",
+        ])
         .args(args)
         .current_dir(compose_dir)
         .env("COMPOSE_PROJECT_NAME", "hypersearch")
         .env("DOCKER_CONFIG", docker_config_dir(&root)?);
     run_command(command)
+}
+
+fn run_compose_dev(args: &[&str]) -> Result<String, String> {
+    let root = repo_root()?;
+    let compose_dir = root.join("infra").join("docker");
+    let mut command = hidden_command("docker");
+    command
+        .args([
+            "compose",
+            "--ansi",
+            "never",
+            "--project-name",
+            "hypersearch",
+            "-f",
+            "docker-compose.yml",
+            "-f",
+            "docker-compose.dev.yml",
+        ])
+        .args(args)
+        .current_dir(compose_dir)
+        .env("COMPOSE_PROJECT_NAME", "hypersearch")
+        .env("DOCKER_CONFIG", docker_config_dir(&root)?);
+    run_command(command)
+}
+
+fn is_registry_access_error(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    [
+        "error from registry: denied",
+        "pull access denied",
+        "repository does not exist",
+        "may require 'docker login'",
+        "requested access to the resource is denied",
+        "unauthorized",
+    ]
+    .iter()
+    .any(|pattern| lower.contains(pattern))
+}
+
+fn compose_up_with_local_build_fallback() -> Result<String, String> {
+    match run_compose(&["up", "-d"]) {
+        Ok(output) => Ok(output),
+        Err(error) if is_registry_access_error(&error) => {
+            log_desktop_event(
+                "backend.action.local_build_fallback",
+                truncate_log(&error, 1200),
+            );
+            let fallback = run_compose_dev(&["up", "-d", "--build"])?;
+            let root = repo_root()?;
+            let root_env = root.join(".env");
+            let compose_env = root.join("infra").join("docker").join(".env");
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_IMAGE_SOURCE",
+                "local-build-fallback",
+            )?;
+            set_env_value(&root_env, "HYPERSEARCH_API_IMAGE", "hypersearch-api:dev")?;
+            set_env_value(&root_env, "HYPERSEARCH_UI_IMAGE", "hypersearch-ui:dev")?;
+            set_env_value(&compose_env, "HYPERSEARCH_API_IMAGE", "hypersearch-api:dev")?;
+            set_env_value(&compose_env, "HYPERSEARCH_UI_IMAGE", "hypersearch-ui:dev")?;
+            Ok(format!(
+                "Prebuilt image pull failed, so HyperSearch built local runtime images from the bundled source.\n\nPull failure:\n{error}\n\nLocal build fallback:\n{fallback}"
+            ))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn shutdown_stack() -> Result<String, String> {
@@ -545,8 +614,7 @@ fn is_docker_version_string(value: &str) -> bool {
     let Some(minor) = parts.next() else {
         return false;
     };
-    major.chars().all(|ch| ch.is_ascii_digit())
-        && minor.chars().all(|ch| ch.is_ascii_digit())
+    major.chars().all(|ch| ch.is_ascii_digit()) && minor.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn docker_info_version(root: &Path) -> Result<String, String> {
@@ -571,15 +639,18 @@ fn docker_info_version(root: &Path) -> Result<String, String> {
     let command_log = write_command_log(&command_debug, &status, &stdout, &stderr, duration)
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_else(|| "<command log unavailable>".to_string());
-    if !output.status.success() || has_fatal_docker_stderr(&stderr) || !is_docker_version_string(&stdout) {
+    if !output.status.success()
+        || has_fatal_docker_stderr(&stderr)
+        || !is_docker_version_string(&stdout)
+    {
         let detail = format!(
             "status={} stdout={} stderr={} command_log={}",
-            output.status,
-            stdout,
-            stderr,
-            command_log
+            output.status, stdout, stderr, command_log
         );
-        log_desktop_event("docker.ready_check.command.not_ready", truncate_log(&detail, 1600));
+        log_desktop_event(
+            "docker.ready_check.command.not_ready",
+            truncate_log(&detail, 1600),
+        );
         return Err(detail);
     }
     log_desktop_event(
@@ -670,6 +741,13 @@ fn set_env_value(path: &Path, name: &str, value: &str) -> Result<(), String> {
         lines.push(format!("{name}={value}"));
     }
     fs::write(path, format!("{}\n", lines.join("\n"))).map_err(|error| error.to_string())
+}
+
+fn set_env_default(path: &Path, name: &str, value: &str) -> Result<(), String> {
+    if read_env_value(path, name, "").is_empty() {
+        set_env_value(path, name, value)?;
+    }
+    Ok(())
 }
 
 fn paired_app_url() -> Result<String, String> {
@@ -779,16 +857,20 @@ fn export_diagnostics_sync() -> Result<String, String> {
     log_desktop_event("diagnostics.export.start", "collecting diagnostics bundle");
     let data_root = hypersearch_data_root()?;
     let (timestamp, _) = utc_timestamp_parts();
-    let target = data_root
-        .join("diagnostics")
-        .join(format!("hypersearch-diagnostics-{}", timestamp.replace(':', "").replace('-', "")));
+    let target = data_root.join("diagnostics").join(format!(
+        "hypersearch-diagnostics-{}",
+        timestamp.replace(':', "").replace('-', "")
+    ));
     fs::create_dir_all(&target).map_err(|error| error.to_string())?;
 
     let root = repo_root()?;
     let env_path = root.join(".env");
     if let Ok(contents) = fs::read_to_string(&env_path) {
-        fs::write(target.join("env.redacted.txt"), redact_env_contents(&contents))
-            .map_err(|error| error.to_string())?;
+        fs::write(
+            target.join("env.redacted.txt"),
+            redact_env_contents(&contents),
+        )
+        .map_err(|error| error.to_string())?;
     }
     let compose_env = root.join("infra").join("docker").join(".env");
     if let Ok(contents) = fs::read_to_string(&compose_env) {
@@ -799,7 +881,11 @@ fn export_diagnostics_sync() -> Result<String, String> {
         .map_err(|error| error.to_string())?;
     }
 
-    write_diagnostics_command(&target, "docker-version.txt", run_docker(&root, &["--version"]));
+    write_diagnostics_command(
+        &target,
+        "docker-version.txt",
+        run_docker(&root, &["--version"]),
+    );
     write_diagnostics_command(&target, "docker-info.txt", run_docker(&root, &["info"]));
     write_diagnostics_command(&target, "docker-images.txt", run_docker(&root, &["images"]));
     write_diagnostics_command(&target, "compose-config.txt", run_compose(&["config"]));
@@ -901,7 +987,7 @@ fn backend_action_sync(action: String) -> Result<String, String> {
     match action.as_str() {
         "up" => {
             let docker = ensure_docker_ready()?;
-            let output = run_compose(&["up", "-d"])?;
+            let output = compose_up_with_local_build_fallback()?;
             let result = format!("{docker}\n{output}");
             log_desktop_event("backend.action.complete", truncate_log(&result, 1200));
             Ok(result)
@@ -919,7 +1005,7 @@ fn backend_action_sync(action: String) -> Result<String, String> {
         "restart" => {
             let docker = ensure_docker_ready()?;
             let down = run_compose(&["down", "--remove-orphans"]).unwrap_or_default();
-            let up = run_compose(&["up", "-d"])?;
+            let up = compose_up_with_local_build_fallback()?;
             let result = format!("{docker}\n{down}\n{up}");
             log_desktop_event("backend.action.complete", truncate_log(&result, 1200));
             Ok(result)
@@ -1225,7 +1311,10 @@ fn main() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 if CLOSE_CONFIRM_ACTIVE.swap(true, Ordering::SeqCst) {
-                    log_desktop_event("app.close.duplicate", "close request ignored because confirmation is already active");
+                    log_desktop_event(
+                        "app.close.duplicate",
+                        "close request ignored because confirmation is already active",
+                    );
                     return;
                 }
                 let app = window.app_handle().clone();

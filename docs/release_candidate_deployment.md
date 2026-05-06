@@ -6,7 +6,7 @@ This guide is the durable reference for building and testing the private HyperSe
 
 HyperSearch now has two installer media channels:
 
-- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop and LM Studio setup, and pulls prebuilt Docker images during setup.
+- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop and LM Studio setup, and pulls prebuilt Docker images during setup. During private beta, if the registry rejects the pull, setup falls back to building the HyperSearch API/UI images locally from the installed source payload and records that choice in the setup summary.
 - **Full media**: beta-testing package. It includes the installer plus `payload\images` Docker image archives so setup can run `docker load` instead of depending on Docker Hub or GHCR during first launch.
 
 The private beta should use full media whenever possible. The online installer is still useful for connected developer systems and later public release testing.
@@ -28,7 +28,7 @@ docker.io/nacsez/hypersearch-api:1.0.0
 docker.io/nacsez/hypersearch-ui:1.0.0
 ```
 
-For private beta media, bundled image archives are preferred because private registry pulls require authentication. Public release can switch online installs to unauthenticated public pulls after the images are made public.
+For private beta media, bundled image archives are preferred because private registry pulls require authentication. The local-build fallback keeps developer/tester machines unblocked, but full media remains the expected beta path because it avoids both private registry credentials and first-run source builds. Public release can switch online installs to unauthenticated public pulls after the images are made public.
 
 ## Build Commands
 
@@ -66,6 +66,14 @@ Release startup uses:
 docker compose --project-name hypersearch up -d
 ```
 
+If the release startup path fails with a registry authorization error, the desktop app runs:
+
+```text
+docker compose --project-name hypersearch -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+After that fallback succeeds, the runtime `.env` files are updated to use `hypersearch-api:dev` and `hypersearch-ui:dev` so later starts do not retry the denied private registry.
+
 Developer builds use:
 
 ```text
@@ -95,7 +103,7 @@ Use **Settings > Export Diagnostics** in the desktop launcher before collecting 
 
 - Full media installs on a clean Windows 11 test machine.
 - Docker images load from bundled archives without registry access.
-- HyperSearch starts without building images on the tester machine.
+- HyperSearch starts from bundled images on full media, or clearly reports and logs the local-build fallback when online private-registry access is unavailable.
 - Search works without LM Studio.
 - Research mode clearly reports local-model readiness and succeeds when LM Studio has a loaded matching model.
 - Installer result screen and diagnostic logs explain any incomplete prerequisite.

@@ -102,6 +102,7 @@ function Copy-BaseArtifacts {
         imageFallbackRegistry = $DockerHubNamespace
         notes = @(
             "Online media pulls prebuilt Docker images during setup.",
+            "During private beta, online media falls back to a local API/UI image build if registry access is denied.",
             "Full media loads image archives from payload\\images when present.",
             "The NSIS setup runs the prerequisite helper and passes the installer media folder to it.",
             "Docker Desktop installation may require Windows administrator approval.",

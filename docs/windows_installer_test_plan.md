@@ -14,7 +14,7 @@ This document tracks the first Windows 11 fresh-machine installer path for Hyper
 - Configure HyperSearch for LM Studio at `http://host.docker.internal:1234`.
 - Load bundled Docker image archives from full media when `payload\images` is present.
 - Pull prebuilt images during online setup when no bundled archive is present.
-- Never build API/UI images on the tester machine during normal release startup.
+- Avoid building API/UI images on the tester machine during normal release startup. If online media cannot access the private registry during beta testing, setup and desktop startup may fall back to a local API/UI image build and record `imageSetup.mode=local-build-fallback`.
 - Choose an initial model profile:
   - 16GB+ adapter RAM: offer/configure `openai/gpt-oss-20b`
   - adequate RAM or midrange GPU: offer/configure `qwen2.5-7b-instruct`
@@ -72,7 +72,7 @@ For a deployment issue report, collect all files under `%LOCALAPPDATA%\HyperSear
 - Confirm the installer log records Docker detection, Docker installer download size, installer exit code, and the post-install Docker version when Docker is installed by setup.
 - Confirm the installer log records LM Studio detection, winget availability, LM Studio installer exit code, and the final detected LM Studio path.
 - Confirm `setup-summary-*.json` includes hardware RAM/GPU detection, selected install profile, runtime copy source/destination, and model-download status.
-- Confirm `setup-summary-*.json` records `imageSetup.mode` as `bundled` for full media and `online` for online media.
+- Confirm `setup-summary-*.json` records `imageSetup.mode` as `bundled` for full media, `online` for successful online pulls, or `local-build-fallback` when private registry access is denied and local source images are built.
 - Confirm `desktop.log` records runtime preparation, Docker readiness checks, `docker compose up -d`, external/internal session launches, XML exports, and app shutdown.
 - Confirm command logs contain full Docker/Compose stdout and stderr.
 - If the model download continues after setup exits, confirm `model-download-*.log` records the `lms get` and `lms server start` exit codes.

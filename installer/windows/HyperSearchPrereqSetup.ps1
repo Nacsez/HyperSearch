@@ -616,6 +616,37 @@ function Get-BundledImageArchives {
     return @($archives | Sort-Object FullName -Unique)
 }
 
+function Test-RegistryAccessError {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $false
+    }
+    $lower = $Value.ToLowerInvariant()
+    foreach ($pattern in @(
+        "error from registry: denied",
+        "pull access denied",
+        "repository does not exist",
+        "may require 'docker login'",
+        "requested access to the resource is denied",
+        "unauthorized"
+    )) {
+        if ($lower.Contains($pattern)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Set-LocalBuildImageProfile {
+    $rootEnv = Join-Path $runtimeRoot ".env"
+    $composeEnv = Join-Path $runtimeRoot "infra\docker\.env"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_IMAGE_SOURCE" -Value "local-build-fallback"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_API_IMAGE" -Value "hypersearch-api:dev"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_UI_IMAGE" -Value "hypersearch-ui:dev"
+    Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_API_IMAGE" -Value "hypersearch-api:dev"
+    Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_UI_IMAGE" -Value "hypersearch-ui:dev"
+}
+
 function Initialize-DockerImages {
     $archives = @(Get-BundledImageArchives)
     $script:setupState["imageSetup"] = [ordered]@{
@@ -661,7 +692,42 @@ function Initialize-DockerImages {
             $script:setupState["imageSetup"]["stderrPath"] = $pull.StderrPath
             if ($pull.ExitCode -ne 0) {
                 $script:setupState["imageSetup"]["errors"] = @($script:setupState["imageSetup"]["errors"]) + "docker compose pull failed"
-                Add-SetupWarning "Docker image pull failed. Check Docker DNS, proxy, VPN, firewall, or private registry access. See $($pull.StderrPath)"
+                $pullOutput = "$($pull.Stdout)`n$($pull.Stderr)"
+                if (Test-RegistryAccessError -Value $pullOutput) {
+                    Add-SetupWarning "Docker image pull failed because registry access was denied. Building HyperSearch API/UI images locally from the installed source payload. See $($pull.StderrPath)"
+                    Set-LocalBuildImageProfile
+                    $script:setupState["imageSetup"]["mode"] = "local-build-fallback"
+                    $build = Invoke-SetupCommand -FilePath "docker" -Arguments @(
+                        "compose",
+                        "--ansi",
+                        "never",
+                        "--project-name",
+                        "hypersearch",
+                        "-f",
+                        "docker-compose.yml",
+                        "-f",
+                        "docker-compose.dev.yml",
+                        "build",
+                        "api",
+                        "ui"
+                    ) -Name "docker-compose-local-build"
+                    $script:setupState["imageSetup"]["localBuild"] = [ordered]@{
+                        exitCode = $build.ExitCode
+                        stdoutPath = $build.StdoutPath
+                        stderrPath = $build.StderrPath
+                    }
+                    if ($build.ExitCode -eq 0) {
+                        $script:setupState["imageSetup"]["verified"] = $true
+                        Write-SetupLog "Local Docker image build fallback completed successfully."
+                    } else {
+                        $script:setupState["imageSetup"]["errors"] = @($script:setupState["imageSetup"]["errors"]) + "docker compose local build fallback failed"
+                        Add-SetupWarning "Local Docker image build fallback failed. Check Docker networking, base image pulls, proxy/VPN, and $($build.StderrPath)"
+                    }
+                } else {
+                    Add-SetupWarning "Docker image pull failed. Check Docker DNS, proxy, VPN, firewall, or private registry access. See $($pull.StderrPath)"
+                }
+            } else {
+                $script:setupState["imageSetup"]["verified"] = $true
             }
         } finally {
             Pop-Location
