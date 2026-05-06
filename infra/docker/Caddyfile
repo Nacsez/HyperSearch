@@ -1,0 +1,19 @@
+:80 {
+  encode zstd gzip
+
+  log {
+    output stdout
+    format json
+  }
+
+  @api path /v1/* /docs* /redoc* /openapi.json
+  handle @api {
+    reverse_proxy api:8000 {
+      header_up X-Hypersearch-Proxy caddy
+    }
+  }
+
+  handle {
+    reverse_proxy ui:80
+  }
+}

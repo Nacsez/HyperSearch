@@ -1,0 +1,16 @@
+[Unit]
+Description=HyperSearch API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hypersearch
+EnvironmentFile=/opt/hypersearch/.env
+ExecStart=/opt/hypersearch/.venv/bin/uvicorn hypersearch_api.main:app --host ${HYPERSEARCH_HOST} --port ${HYPERSEARCH_PORT}
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

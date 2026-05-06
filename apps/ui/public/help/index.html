@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HyperSearch Help</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe1;
+        --bg-accent:
+          radial-gradient(circle at top left, rgba(224, 119, 43, 0.18), transparent 32%),
+          radial-gradient(circle at right, rgba(42, 100, 85, 0.18), transparent 35%),
+          #f5efe1;
+        --surface: rgba(255, 252, 246, 0.88);
+        --surface-strong: #fffaf0;
+        --text: #1d1a16;
+        --muted: #675f55;
+        --border: rgba(55, 43, 30, 0.14);
+        --accent: #b24d19;
+        --accent-strong: #7f2f08;
+        --success: #2f7d56;
+        --shadow: 0 22px 50px rgba(91, 58, 25, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg-accent);
+        color: var(--text);
+        font-family: "Aptos", "Segoe UI Variable", "Trebuchet MS", sans-serif;
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+
+      .page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 28px 20px 56px;
+      }
+
+      .hero,
+      .card {
+        background: var(--surface);
+        backdrop-filter: blur(18px);
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        gap: 18px;
+        padding: 28px;
+        margin-bottom: 22px;
+      }
+
+      .hero__meta,
+      .nav,
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        letter-spacing: -0.02em;
+      }
+
+      h1 {
+        font-size: clamp(2.4rem, 4vw, 4rem);
+        line-height: 0.95;
+      }
+
+      h2 {
+        font-size: 1.7rem;
+        margin-bottom: 10px;
+      }
+
+      h3 {
+        font-size: 1.15rem;
+        margin-bottom: 8px;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      .hero p:last-child {
+        max-width: 720px;
+        margin: 0;
+      }
+
+      .chip,
+      .nav a,
+      .button-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0.6rem 0.95rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface-strong);
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .chip {
+        min-height: auto;
+        padding: 0.35rem 0.75rem;
+        color: var(--muted);
+        background: rgba(178, 77, 25, 0.06);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .content {
+        display: grid;
+        gap: 20px;
+      }
+
+      .card {
+        padding: 24px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 18px;
+        display: grid;
+        gap: 20px;
+      }
+
+      .sidebar .card {
+        padding: 20px;
+      }
+
+      .checklist,
+      .plain-list {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .plain-list li + li,
+      .checklist li + li {
+        margin-top: 8px;
+      }
+
+      .field-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+
+      .field-table th,
+      .field-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .field-table th {
+        background: rgba(178, 77, 25, 0.08);
+      }
+
+      .field-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .callout {
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(178, 77, 25, 0.06), rgba(42, 100, 85, 0.05));
+      }
+
+      pre {
+        margin: 0;
+        overflow: auto;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: #1d1a16;
+        color: #f4ede4;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .section-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .footer-note {
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      @media (max-width: 960px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+        }
+
+        .grid-two {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">HyperSearch Help</p>
+        <h1>Operator Guide</h1>
+        <p>
+          This page is the shipped help system for HyperSearch. It explains the UI fields, preset workflow,
+          headless API usage, installation, deployment, and a practical validation checklist.
+        </p>
+        <div class="chip-row">
+          <span class="chip">UI + API</span>
+          <span class="chip">Local-first</span>
+          <span class="chip">Local models only</span>
+          <span class="chip">Repository-owned documentation</span>
+        </div>
+        <nav class="nav" aria-label="Quick links">
+          <a href="#what-it-does">What It Does</a>
+          <a href="#field-reference">Field Reference</a>
+          <a href="#presets">Presets</a>
+          <a href="#xml-export">XML Export</a>
+          <a href="#ui-exercises">UI Exercises</a>
+          <a href="#headless">Headless</a>
+          <a href="#install">Install</a>
+          <a href="#testing">Testing</a>
+        </nav>
+      </header>
+
+      <div class="layout">
+        <main class="content">
+          <section class="card section-stack" id="what-it-does">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2>What HyperSearch Does</h2>
+            </div>
+            <p>
+              HyperSearch is an API-first local research service. It sends web queries to SearXNG, optionally fetches
+              result pages, extracts text, and can ask a local model provider such as LM Studio to synthesize an answer
+              with citations. The web UI is a first-party operator console on top of the same backend endpoints that
+              headless clients use.
+            </p>
+            <div class="grid-two">
+              <div class="callout">
+                <h3>Search mode</h3>
+                <p>
+                  Returns ranked search results quickly. This is the fastest path and should be your default when you
+                  want links, snippets, caching behavior, and basic summaries.
+                </p>
+              </div>
+              <div class="callout">
+                <h3>Research mode</h3>
+                <p>
+                  Pulls top results, fetches page content, extracts readable text, and asks the active provider to
+                  synthesize an answer with citations and a debug trace.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="card section-stack">
+            <div>
+              <p class="eyebrow">Observed Behavior</p>
+              <h2>What The Recent Logs Show</h2>
+            </div>
+            <ul class="plain-list">
+              <li>Basic search requests are healthy and usually completed in about 1.0 to 1.1 seconds for simple runs.</li>
+              <li>Broader search runs with more payload or more engines were closer to 3.3 to 3.8 seconds.</li>
+              <li>Provider health tests against LM Studio completed successfully in about 3.8 to 5.2 seconds.</li>
+              <li>Research runs varied a lot: one completed in about 6.3 seconds, while a deeper run took about 49.2 seconds.</li>
+              <li>Some target sites returned <code>403 Forbidden</code> during fetch and extract. That is expected on parts of the public web and should not be treated as a HyperSearch failure by itself.</li>
+              <li>Trafilatura occasionally logged <code>discarding data: None</code>. That is a recoverable extraction edge case, not a crash.</li>
+              <li>Caddy access logs showed clean end-to-end proxying with request IDs and trace IDs preserved on API responses.</li>
+            </ul>
+            <div class="callout">
+              <strong>Operational takeaway:</strong>
+              <p>
+                Search latency is currently good. Research latency depends heavily on the target pages and fetchability.
+                Your test plan should therefore cover both fast, cooperative sources and slower or blocked sources.
+              </p>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="field-reference">
+            <div>
+              <p class="eyebrow">Reference</p>
+              <h2>Field Guide</h2>
+            </div>
+            <table class="field-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Used By</th>
+                  <th>Meaning</th>
+                  <th>Operator Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>Query</code></td>
+                  <td>Search, Research</td>
+                  <td>The search phrase sent to SearXNG.</td>
+                  <td>Use focused, factual queries first. Broader wording increases result variety but can increase noise.</td>
+                </tr>
+                <tr>
+                  <td><code>Engines</code></td>
+                  <td>Search, Research</td>
+                  <td>Comma-separated engine list such as <code>google,duckduckgo</code>.</td>
+                  <td>Leave blank to use backend defaults. Restrict this when comparing engine behavior.</td>
+                </tr>
+                <tr>
+                  <td><code>Categories</code></td>
+                  <td>Search, Research</td>
+                  <td>Comma-separated SearXNG categories such as <code>general,news</code>.</td>
+                  <td>Useful for isolating news-like results or narrowing broad searches.</td>
+                </tr>
+                <tr>
+                  <td><code>Language</code></td>
+                  <td>Search, Research</td>
+                  <td>Language hint, for example <code>en-US</code>.</td>
+                  <td>Use when you need locale-sensitive ranking or local-language material.</td>
+                </tr>
+                <tr>
+                  <td><code>Date Range</code></td>
+                  <td>Search, Research</td>
+                  <td>Freshness filter such as past day, week, month, or year when the selected search engine supports it.</td>
+                  <td>Useful for current events. Leave blank for general web discovery.</td>
+                </tr>
+                <tr>
+                  <td><code>Results to Collect</code></td>
+                  <td>Search, Research</td>
+                  <td>Total number of search results HyperSearch should collect. The UI calculates backend page settings automatically.</td>
+                  <td>Increase this when you need deeper recall; larger values are slower and produce more local cache entries.</td>
+                </tr>
+                <tr>
+                  <td><code>Research Sources</code></td>
+                  <td>Research</td>
+                  <td>How many collected search hits to fetch, summarize, and synthesize.</td>
+                  <td>Start around <code>3</code> to <code>5</code>. The default 1.0 bound is <code>250</code>; large values can make research much slower.</td>
+                </tr>
+                <tr>
+                  <td><code>Safe Search</code></td>
+                  <td>Search, Research</td>
+                  <td>SearXNG safety mode: off, moderate, or strict.</td>
+                  <td>Leave at moderate for most use.</td>
+                </tr>
+                <tr>
+                  <td><code>Cache Policy</code></td>
+                  <td>Search, Research</td>
+                  <td>Controls cache usage for search, fetch, extract, and synthesis paths.</td>
+                  <td><code>use</code> is normal. <code>bypass</code> is best for fresh verification. <code>refresh</code> forces recomputation and updates cache.</td>
+                </tr>
+                <tr>
+                  <td><code>Dedupe</code></td>
+                  <td>Search</td>
+                  <td>Removes duplicate or near-duplicate results.</td>
+                  <td>Usually leave on unless you are analyzing engine overlap.</td>
+                </tr>
+                <tr>
+                  <td><code>Fetch pages</code></td>
+                  <td>Search</td>
+                  <td>Fetches linked pages after search.</td>
+                  <td>Use this when snippets are not enough and you want body content attached to results.</td>
+                </tr>
+                <tr>
+                  <td><code>Extract text</code></td>
+                  <td>Search</td>
+                  <td>Runs extraction on fetched pages.</td>
+                  <td>Best paired with <code>Fetch pages</code>. Useful when snippets are noisy or truncated.</td>
+                </tr>
+                <tr>
+                  <td><code>Search summary</code></td>
+                  <td>Search</td>
+                  <td>Requests a compact search-level summary.</td>
+                  <td>Good for quick scans without invoking full research mode.</td>
+                </tr>
+                <tr>
+                  <td><code>Provider Override</code></td>
+                  <td>Research</td>
+                  <td>Forces research synthesis through a specific configured provider.</td>
+                  <td>Leave blank to use the default provider. Useful for A/B comparison across providers later.</td>
+                </tr>
+                <tr>
+                  <td><code>Timeout (ms)</code></td>
+                  <td>Search, Research</td>
+                  <td>Request timeout budget.</td>
+                  <td>Raise this for heavy research runs. A short timeout is a good stress test input.</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="callout">
+              <strong>Headless-only options:</strong>
+              <p>
+                The API also exposes options like <code>streaming</code> and <code>include_debug_trace</code>. These are
+                useful when integrating HyperSearch into scripts, agents, or other services.
+              </p>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="presets">
+            <div>
+              <p class="eyebrow">Workflow</p>
+              <h2>Presets And Profiles</h2>
+            </div>
+            <p>
+              The current UI uses a preset system. If you think of these as search profiles, that is the right mental
+              model. A preset stores the current request shape so you can re-run common tasks without re-entering all
+              fields.
+            </p>
+            <ul class="plain-list">
+              <li>Set the fields you want in the search form.</li>
+              <li>Click <strong>Save Preset</strong>.</li>
+              <li>Give the preset a descriptive name such as <code>Recent news sweep</code> or <code>Wikipedia fact check</code>.</li>
+              <li>Use the saved preset chips at the bottom of the search form to load it later.</li>
+              <li>After loading a preset, you can still change individual fields before running the next request.</li>
+            </ul>
+            <div class="callout">
+              <strong>Recommended naming pattern:</strong>
+              <p>
+                Use names that encode both intent and shape, for example <code>News month fast</code>,
+                <code>Deep research 5 pages</code>, or <code>English general bypass cache</code>.
+              </p>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="xml-export">
+            <div>
+              <p class="eyebrow">Export</p>
+              <h2>Session XML Export</h2>
+            </div>
+            <p>
+              Session XML export is meant for durable personal archives, notebook ingestion, and downstream automation.
+              Browser sessions download the XML through the browser. Embedded desktop sessions hand the XML to the
+              desktop shell, which writes the file into the export folder configured in desktop settings.
+            </p>
+            <div class="grid-two">
+              <div class="section-stack">
+                <h3>File naming</h3>
+                <p>
+                  Exported files use the first 48 characters of the active query, sanitized for Windows filenames,
+                  followed by a timestamp such as <code>20260426_153015.xml</code>.
+                </p>
+              </div>
+              <div class="section-stack">
+                <h3>Included fields</h3>
+                <p>
+                  Open <strong>Search Settings</strong>, then <strong>XML export contents</strong>, to choose whether
+                  the export contains metadata, the question, search results, fetched full text, summaries, research
+                  answer, research sources, activity log, and provider trace.
+                </p>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Privacy note:</strong>
+              <p>
+                XML exports can include scraped page text, local provider/model metadata, and detailed activity logs.
+                Turn off fields you do not need before sharing an export outside your own machine.
+              </p>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="ui-exercises">
+            <div>
+              <p class="eyebrow">Exercises</p>
+              <h2>UI Walkthroughs</h2>
+            </div>
+            <div class="grid-two">
+              <div class="section-stack">
+                <h3>Exercise 1: Basic search in the UI</h3>
+                <ol class="plain-list">
+                  <li>Open the main app at <code>http://127.0.0.1:8090/</code>.</li>
+                  <li>Enter <code>history of cincinnati ohio</code> as the query.</li>
+                  <li>Set <code>Results to Collect</code> to <code>10</code>.</li>
+                  <li>Leave cache policy at <code>use</code> for the first run.</li>
+                  <li>Click <strong>Run Search</strong>.</li>
+                  <li>Verify that the workspace shows result count, request ID, result cards, and cache state.</li>
+                  <li>Open <strong>Verbose log</strong> and confirm the raw payload for the request exists.</li>
+                </ol>
+              </div>
+              <div class="section-stack">
+                <h3>Exercise 2: Research synthesis in the UI</h3>
+                <ol class="plain-list">
+                  <li>Set query to <code>origin of ronald mcdonald</code>.</li>
+                  <li>Set <code>Research Sources = 3</code> for a moderate run.</li>
+                  <li>Optionally open advanced controls and set a larger timeout such as <code>60000</code>.</li>
+                  <li>Click <strong>Research Synthesis</strong>.</li>
+                  <li>Verify that the answer panel fills in above the collected source list.</li>
+                  <li>Check that an answer appears with numbered citations and a trace summary.</li>
+                  <li>Open the debug trace details and verify the request completed even if some pages were blocked.</li>
+                </ol>
+              </div>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="headless">
+            <div>
+              <p class="eyebrow">API</p>
+              <h2>Headless Usage</h2>
+            </div>
+            <p>
+              Headless use goes through the same backend as the UI. Local requests on localhost do not need a token.
+              LAN access must be enabled in the desktop launcher and paired clients should supply
+              <code>X-HyperSearch-Token</code>.
+            </p>
+            <div class="section-stack">
+              <h3>PowerShell search example</h3>
+              <pre>.\scripts\Invoke-HyperSearch.cmd `
+  -Action search `
+  -Query "history of cincinnati ohio" `
+  -Results 10 `
+  -Summarize</pre>
+              <pre>{
+  "query": "history of cincinnati ohio",
+  "page": 1,
+  "results_per_page": 5,
+  "max_pages": 1,
+  "safe_search": 1,
+  "dedupe": true,
+  "fetch_pages": false,
+  "extract_text": false,
+  "summarize": true,
+  "streaming": false,
+  "timeout_ms": 15000,
+  "cache_policy": "use"
+}
+</pre>
+              <pre>$body = @'
+{
+  "query": "history of cincinnati ohio",
+  "page": 1,
+  "results_per_page": 5,
+  "max_pages": 1,
+  "safe_search": 1,
+  "dedupe": true,
+  "fetch_pages": false,
+  "extract_text": false,
+  "summarize": true,
+  "streaming": false,
+  "timeout_ms": 15000,
+  "cache_policy": "use"
+}
+'@
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8090/v1/search `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body $body</pre>
+            </div>
+            <div class="section-stack">
+              <h3>PowerShell research example</h3>
+              <pre>.\scripts\Invoke-HyperSearch.cmd `
+  -Action research `
+  -Query "origin of ronald mcdonald" `
+  -Results 25 `
+  -ResearchSources 5 `
+  -TimeoutMs 60000</pre>
+              <pre>$body = @'
+{
+  "query": "origin of ronald mcdonald",
+  "page": 1,
+  "results_per_page": 10,
+  "max_pages": 1,
+  "top_n": 3,
+  "timeout_ms": 60000,
+  "cache_policy": "use",
+  "provider": null,
+  "streaming": false,
+  "include_debug_trace": true
+}
+'@
+
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8090/v1/research `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body $body</pre>
+            </div>
+            <div class="section-stack">
+              <h3>Provider and history automation</h3>
+              <pre>.\scripts\Invoke-HyperSearch.cmd -Action providers
+.\scripts\Invoke-HyperSearch.cmd -Action provider-models -ProviderName lmstudio
+.\scripts\Invoke-HyperSearch.cmd `
+  -Action set-provider `
+  -ProviderName lmstudio `
+  -DisplayName "LM Studio" `
+  -BaseProviderUrl "http://host.docker.internal:1234" `
+  -Model "loaded-model-id" `
+  -MakeDefault
+.\scripts\Invoke-HyperSearch.cmd -Action history-export</pre>
+            </div>
+            <div class="section-stack">
+              <h3>cURL examples</h3>
+              <pre>curl -s http://127.0.0.1:8090/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query":"history of cincinnati ohio",
+    "page":1,
+    "results_per_page":5,
+    "max_pages":1,
+    "safe_search":1,
+    "dedupe":true,
+    "fetch_pages":false,
+    "extract_text":false,
+    "summarize":true,
+    "streaming":false,
+    "timeout_ms":15000,
+    "cache_policy":"use"
+  }'
+
+curl -s http://127.0.0.1:8090/v1/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query":"origin of ronald mcdonald",
+    "page":1,
+    "results_per_page":10,
+    "max_pages":1,
+    "top_n":3,
+    "timeout_ms":60000,
+    "cache_policy":"use",
+    "provider":null,
+    "streaming":false,
+    "include_debug_trace":true
+  }'</pre>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="install">
+            <div>
+              <p class="eyebrow">Deploy</p>
+              <h2>Installation And Deployment</h2>
+            </div>
+            <div class="grid-two">
+              <div class="section-stack">
+                <h3>Release candidate install</h3>
+                <ol class="plain-list">
+                  <li>Use the full installer media for private beta tests whenever possible.</li>
+                  <li>Run <code>HyperSearch_1.0.0_x64-setup.exe</code> from the media folder.</li>
+                  <li>If <code>payload\images</code> is present, setup loads Docker images locally with <code>docker load</code>.</li>
+                  <li>If no image archive is present, setup uses online mode and pulls prebuilt images.</li>
+                  <li>Review the setup result screen before closing the installer.</li>
+                  <li>Launch HyperSearch Desktop and press <strong>Start</strong>.</li>
+                  <li>Keep LAN mode disabled unless another local-network device needs access.</li>
+                </ol>
+              </div>
+              <div class="section-stack">
+                <h3>Local development</h3>
+                <ol class="plain-list">
+                  <li>Create a Python virtual environment and install the API package from <code>apps/api</code>.</li>
+                  <li>Install UI dependencies in <code>apps/ui</code> with <code>npm install</code>.</li>
+                  <li>Run the API with Uvicorn on <code>127.0.0.1:8000</code>.</li>
+                  <li>Run the UI with <code>npm run dev</code> on <code>127.0.0.1:5173</code>.</li>
+                  <li>For Compose release mode, run <code>docker compose --project-name hypersearch up -d</code>.</li>
+                  <li>For local image builds, add <code>-f docker-compose.yml -f docker-compose.dev.yml up -d --build</code>.</li>
+                </ol>
+              </div>
+            </div>
+            <div class="grid-two">
+              <div class="section-stack">
+                <h3>Docker Desktop</h3>
+                <ul class="plain-list">
+                  <li>Setup detects Docker Desktop and can guide installation when missing.</li>
+                  <li>Startup requires a clean Docker engine version response.</li>
+                  <li>Online media requires registry/DNS/proxy access for image pulls.</li>
+                  <li>Full media can start without registry access after images are loaded.</li>
+                </ul>
+              </div>
+              <div class="section-stack">
+                <h3>LM Studio and models</h3>
+                <ul class="plain-list">
+                  <li>Research synthesis requires a local OpenAI-compatible endpoint.</li>
+                  <li>Docker-managed HyperSearch usually reaches LM Studio at <code>http://host.docker.internal:1234</code>.</li>
+                  <li>Low-resource systems may be configured as search-only until a suitable model is selected.</li>
+                  <li>Use <strong>Operations</strong> to discover loaded models, select a model, save the provider, and run a provider test.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Network exposure:</strong>
+              <p>
+                HyperSearch is designed to bind to localhost by default. LAN mode is opt-in from the desktop launcher
+                and paired browsers must send the generated pairing token. Do not expose HyperSearch to the public internet.
+              </p>
+            </div>
+            <div class="callout">
+              <strong>Diagnostics:</strong>
+              <p>
+                Installer logs, setup summaries, desktop logs, and full command logs are written under
+                <code>%LOCALAPPDATA%\HyperSearch\logs</code>. Use desktop <strong>Settings &gt; Export Diagnostics</strong>
+                before filing a beta issue report.
+              </p>
+            </div>
+          </section>
+
+          <section class="card section-stack" id="testing">
+            <div>
+              <p class="eyebrow">Validation</p>
+              <h2>Thorough Testing Plan</h2>
+            </div>
+            <h3>Phase 1: Stack health</h3>
+            <ol class="checklist">
+              <li>Open the UI and confirm the shell loads without layout breakage.</li>
+              <li>Open the help page from the <strong>Help</strong> button and verify it loads in a browser tab or a desktop session titled <strong>Help</strong>.</li>
+              <li>Open <strong>Operations</strong> and run a provider test.</li>
+              <li>Verify provider status is healthy and response time is within a reasonable few-second range.</li>
+              <li>Confirm the verbose log records admin events.</li>
+            </ol>
+            <h3>Phase 2: Core search behavior</h3>
+            <ol class="checklist">
+              <li>Run a simple factual search with cache policy <code>use</code>.</li>
+              <li>Run the same search again and verify a more cache-heavy result path.</li>
+              <li>Run again with cache policy <code>bypass</code> and confirm it still succeeds.</li>
+              <li>Toggle <code>Dedupe</code> off and compare the number and similarity of results.</li>
+              <li>Change <code>Results to Collect</code> from 5 to 20 and verify payload size and UI handling remain solid.</li>
+              <li>Use advanced controls to restrict engines and categories, then verify the returned result mix changes.</li>
+            </ol>
+            <h3>Phase 3: Fetch and extract behavior</h3>
+            <ol class="checklist">
+              <li>Run search with <code>Fetch pages</code> enabled on a cooperative source like Wikipedia.</li>
+              <li>Run search with <code>Fetch pages</code> and <code>Extract text</code> enabled.</li>
+              <li>Confirm some result cards show fetched and extracted markers.</li>
+              <li>Repeat with a more hostile query that is likely to include blocked domains and confirm the request still completes.</li>
+            </ol>
+            <h3>Phase 4: Research behavior</h3>
+            <ol class="checklist">
+              <li>Run a short research request with <code>Research Sources = 2</code> or <code>3</code>.</li>
+              <li>Confirm answer text, citation cards, and trace summary all appear.</li>
+              <li>Run the same research again with <code>refresh</code> cache policy.</li>
+              <li>Raise <code>Research Sources</code> and timeout to simulate a slower research path.</li>
+              <li>Verify long-running research still completes and the UI remains usable while waiting.</li>
+            </ol>
+            <h3>Phase 5: Headless API checks</h3>
+            <ol class="checklist">
+              <li>Run the search PowerShell example from this page and confirm a <code>request_id</code> is returned.</li>
+              <li>Run the research PowerShell example and verify citations plus trace fields are present.</li>
+              <li>Capture one response and verify request IDs in the payload line up with the API logs.</li>
+              <li>If you plan LAN access, repeat the same calls with <code>X-HyperSearch-Token</code> set.</li>
+            </ol>
+            <h3>Phase 6: Regression passes</h3>
+            <ol class="checklist">
+              <li>Save a preset, reload it, and verify fields rehydrate correctly.</li>
+              <li>Toggle light and dark mode and confirm the drawer and workspace remain readable.</li>
+              <li>Resize the browser to a narrower width and verify controls and drawers stay usable.</li>
+              <li>Use the verbose log after several actions and confirm event selection still maps to the right payload.</li>
+            </ol>
+          </section>
+
+          <section class="card section-stack">
+            <div>
+              <p class="eyebrow">Maintainers</p>
+              <h2>Updating This Help Page</h2>
+            </div>
+            <p>
+              This help system is part of the repository and ships with the UI build. Edit
+              <code>apps/ui/public/help/index.html</code> whenever a field, workflow, deployment step, or operator
+              expectation changes.
+            </p>
+            <p class="footer-note">
+              Keep the API examples aligned with the live schemas in the backend and the field labels aligned with the React UI.
+            </p>
+          </section>
+        </main>
+
+        <aside class="sidebar">
+          <section class="card section-stack">
+            <div>
+              <p class="eyebrow">Quick Start</p>
+              <h3>Most common operator loop</h3>
+            </div>
+            <ol class="plain-list">
+              <li>Confirm provider health.</li>
+              <li>Run search first.</li>
+              <li>Inspect results.</li>
+              <li>Escalate to research only when you need synthesis.</li>
+              <li>Use verbose log when you need raw payloads.</li>
+            </ol>
+          </section>
+
+          <section class="card section-stack">
+            <div>
+              <p class="eyebrow">Known Behaviors</p>
+              <h3>Do not misread these as failures</h3>
+            </div>
+            <ul class="plain-list">
+              <li>Some pages on the web will block automated fetches with 403 responses.</li>
+              <li>Provider tests are usually slower than search because they hit the local model backend.</li>
+              <li>Research duration can jump sharply when top N is high or sources are heavy.</li>
+            </ul>
+          </section>
+
+          <section class="card section-stack">
+            <div>
+              <p class="eyebrow">Back To App</p>
+              <h3>Primary console</h3>
+            </div>
+            <a class="button-link" href="/">Return to HyperSearch</a>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </body>
+</html>

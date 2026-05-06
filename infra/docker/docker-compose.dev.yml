@@ -1,0 +1,10 @@
+services:
+  api:
+    build:
+      context: ../../apps/api
+    image: hypersearch-api:dev
+
+  ui:
+    build:
+      context: ../../apps/ui
+    image: hypersearch-ui:dev

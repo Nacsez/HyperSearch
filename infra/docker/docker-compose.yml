@@ -1,0 +1,51 @@
+name: ${COMPOSE_PROJECT_NAME:-hypersearch}
+
+services:
+  api:
+    image: ${HYPERSEARCH_API_IMAGE:-ghcr.io/nacsez/hypersearch-api:1.0.0}
+    env_file:
+      - ../../.env
+    environment:
+      HYPERSEARCH_HOST: 0.0.0.0
+      HYPERSEARCH_PORT: 8000
+      HYPERSEARCH_SQLITE_PATH: /data/hypersearch.db
+      HYPERSEARCH_SEARXNG_URL: http://searxng:8080
+      HYPERSEARCH_VALKEY_URL: redis://valkey:6379/0
+      HYPERSEARCH_ALLOW_ORIGINS: http://127.0.0.1:${HYPERSEARCH_HTTP_PORT:-8090},http://localhost:${HYPERSEARCH_HTTP_PORT:-8090}
+      HYPERSEARCH_LMSTUDIO_BASE_URL: ${HYPERSEARCH_LMSTUDIO_BASE_URL:-http://host.docker.internal:1234}
+    volumes:
+      - ../../data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - valkey
+      - searxng
+    restart: unless-stopped
+
+  ui:
+    image: ${HYPERSEARCH_UI_IMAGE:-ghcr.io/nacsez/hypersearch-ui:1.0.0}
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+
+  searxng:
+    image: ${HYPERSEARCH_SEARXNG_IMAGE:-searxng/searxng:latest}
+    environment:
+      BASE_URL: http://127.0.0.1:8081/
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${HYPERSEARCH_BIND_HOST:-127.0.0.1}:${HYPERSEARCH_HTTP_PORT:-8090}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - api
+      - ui
+    restart: unless-stopped

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HyperSearch",
+  "version": "1.0.0",
+  "identifier": "local.hypersearch.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5174",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "HyperSearch",
+        "width": 1040,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": ["icons/icon.ico"],
+    "publisher": "HyperSearch contributors",
+    "shortDescription": "Local-first search and research launcher",
+    "longDescription": "HyperSearch manages a local search stack and local model-backed research workflow.",
+    "resources": {
+      "../../../.env.example": "hypersearch-stack/.env.example",
+      "../../../README.md": "hypersearch-stack/README.md",
+      "../../../LICENSE.md": "hypersearch-stack/LICENSE.md",
+      "../../../SECURITY.md": "hypersearch-stack/SECURITY.md",
+      "../../../CHANGELOG.md": "hypersearch-stack/CHANGELOG.md",
+      "../../../docs": "hypersearch-stack/docs",
+      "../../../infra": "hypersearch-stack/infra",
+      "../../../apps/api/Dockerfile": "hypersearch-stack/apps/api/Dockerfile",
+      "../../../apps/api/pyproject.toml": "hypersearch-stack/apps/api/pyproject.toml",
+      "../../../apps/api/hypersearch_api": "hypersearch-stack/apps/api/hypersearch_api",
+      "../../../apps/ui/Dockerfile": "hypersearch-stack/apps/ui/Dockerfile",
+      "../../../apps/ui/nginx.conf": "hypersearch-stack/apps/ui/nginx.conf",
+      "../../../apps/ui/package.json": "hypersearch-stack/apps/ui/package.json",
+      "../../../apps/ui/package-lock.json": "hypersearch-stack/apps/ui/package-lock.json",
+      "../../../apps/ui/index.html": "hypersearch-stack/apps/ui/index.html",
+      "../../../apps/ui/tsconfig.json": "hypersearch-stack/apps/ui/tsconfig.json",
+      "../../../apps/ui/tsconfig.node.json": "hypersearch-stack/apps/ui/tsconfig.node.json",
+      "../../../apps/ui/vite.config.ts": "hypersearch-stack/apps/ui/vite.config.ts",
+      "../../../apps/ui/src": "hypersearch-stack/apps/ui/src",
+      "../../../apps/ui/public": "hypersearch-stack/apps/ui/public",
+      "../../../installer/windows": "installer/windows"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "../../../installer/windows/nsis-hooks.nsh",
+        "installMode": "both",
+        "startMenuFolder": "HyperSearch"
+      }
+    }
+  }
+}

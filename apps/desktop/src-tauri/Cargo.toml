@@ -1,0 +1,19 @@
+[package]
+name = "hypersearch-desktop"
+version = "1.0.0"
+description = "HyperSearch Windows launcher"
+authors = ["HyperSearch contributors"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
