@@ -32,20 +32,21 @@ That starts the Docker Compose backend and opens the browser console at the conf
 For local image development, use:
 
 ```powershell
-.\scripts\Deploy-HyperSearch.ps1 -Action up -Build
+.\scripts\Deploy-HyperSearch.cmd -Action up -Build
 ```
 
 For release-mode startup, use:
 
 ```powershell
-.\scripts\Deploy-HyperSearch.ps1 -Action up
+.\scripts\Deploy-HyperSearch.cmd -Action up
 ```
 
 ## Prerequisites
 
 - Docker Desktop must be installed and running for the backend stack.
-- LM Studio is optional for search, but required for research synthesis.
+- LM Studio is optional for search and source review. It is required only for model synthesis.
 - LM Studio must have its local server enabled and a model loaded that matches the saved provider profile.
+- Run `.\scripts\Deploy-HyperSearch.cmd -Action doctor` for Docker config, context, named-pipe, service, and group membership diagnostics.
 
 ## Release Candidate Media
 

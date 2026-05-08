@@ -12,29 +12,35 @@
 - `POST /v1/research`
   - Runs search, fetches/extracts top results, then synthesizes an answer with citations and a trace payload.
   - Supports provider override and SSE streaming mode.
-  - Requires a reachable local provider and verifies the saved preferred model before synthesis.
+  - If app-level LLM is disabled or the selected provider/model is unavailable, returns a valid `ResearchResponse` with `trace.mode="search-only-fallback"` and source-review notes instead of failing the request.
+  - Treats `timeout_ms` as the overall research budget and returns fallback source review on deadline.
   - The UI field **Research Sources** maps to `top_n`, currently bounded from 1 to 250.
 
 ## Providers
 
 - `GET /v1/providers`
 - `POST /v1/providers/test`
+- `POST /v1/providers/models`
 - `POST /v1/providers/default`
 - `PATCH /v1/providers/{name}`
 - `POST /v1/providers/{name}/verify-model`
 
-Provider profiles store local endpoint, provider type, preferred model, display name, enabled state, and default state. They do not store cloud API keys.
+Provider profiles store local endpoint, provider type, preferred model, display name, enabled state, and default state. They do not store cloud API keys. Provider test/model discovery/verify endpoints accept draft `base_url`, `model`, `enabled`, and `provider_type` values so the UI can test the selected model before saving a profile.
 
 ## Operations
 
 - `GET /v1/health`
 - `GET /v1/live`
 - `GET /v1/ready`
+- `GET /v1/admin/llm`
+- `PATCH /v1/admin/llm`
 - `GET /v1/metrics`
 - `POST /v1/admin/cache/invalidate`
 - `POST /v1/admin/maintenance/vacuum`
 - `GET /v1/search/presets`
 - `POST /v1/search/presets`
+
+`/v1/ready` keeps `status` scoped to search-core readiness. A search-ready, LLM-off installation returns `status="ready"` with `capabilities.search.ready=true` and `capabilities.llm.enabled=false`. `/v1/admin/llm` is local-only and returns `{ enabled, reason, source }`.
 
 ## History
 

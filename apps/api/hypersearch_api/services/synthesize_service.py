@@ -20,13 +20,24 @@ FINAL_EVIDENCE_BRIEF_CHARS = 12000
 FINAL_SOURCE_LIST_CHARS = 5000
 COMPACT_FINAL_EVIDENCE_BRIEF_CHARS = 8500
 COMPACT_FINAL_SOURCE_LIST_CHARS = 3800
-BATCH_SUMMARY_TIMEOUT_MS = 60000
-SYNTHESIS_TIMEOUT_MS = 90000
+BATCH_SUMMARY_TIMEOUT_MS = 180000
+SYNTHESIS_TIMEOUT_MS = 300000
+MAX_PROVIDER_CALL_TIMEOUT_MS = 600000
 SEARCH_SUMMARY_MAX_TOKENS = 1200
 BATCH_SUMMARY_MAX_TOKENS = 1000
 CONSOLIDATION_MAX_TOKENS = 1400
 QUESTION_REFINEMENT_MAX_TOKENS = 700
 FINAL_ANSWER_MAX_TOKENS = 2400
+CONTEXT_RETRY_PROMPT_CHARS = (14000, 10000, 7000, 4500, 2800)
+CONTEXT_ERROR_PATTERNS = (
+    "context length",
+    "context window",
+    "maximum context",
+    "token limit",
+    "too many tokens",
+    "prompt is too long",
+    "reduce the length",
+)
 
 
 class SynthesizeService:
@@ -44,6 +55,20 @@ class SynthesizeService:
     def _error_detail(self, exc: Exception) -> str:
         detail = str(exc).strip() or repr(exc)
         return f"{type(exc).__name__}: {detail}"
+
+    def _is_context_budget_error(self, exc: Exception) -> bool:
+        detail = self._error_detail(exc).lower()
+        return any(pattern in detail for pattern in CONTEXT_ERROR_PATTERNS)
+
+    def _prompt_retry_budgets(self, start_chars: int = MAX_CHAT_USER_CHARS) -> list[int]:
+        start = max(1200, min(start_chars, MAX_CHAT_USER_CHARS))
+        budgets = [start]
+        budgets.extend(value for value in CONTEXT_RETRY_PROMPT_CHARS if value < start)
+        return budgets
+
+    def _model_call_timeout(self, *, requested_ms: int | None, minimum_ms: int) -> int:
+        requested = requested_ms or 0
+        return min(MAX_PROVIDER_CALL_TIMEOUT_MS, max(minimum_ms, requested))
 
     def _extractive_search_summary(
         self,
@@ -116,21 +141,36 @@ class SynthesizeService:
         temperature: float = 0.2,
         timeout_ms: int | None = None,
         max_tokens: int | None = None,
+        prompt_budget_chars: int = MAX_CHAT_USER_CHARS,
     ):
-        user = self._fit_prompt_text(
-            user,
-            max_chars=MAX_CHAT_USER_CHARS,
-            label="the prompt",
-        )
-        return await provider.chat(
-            messages=[
-                LLMMessage(role="system", content=system),
-                LLMMessage(role="user", content=user),
-            ],
-            temperature=temperature,
-            timeout_ms=timeout_ms,
-            max_tokens=max_tokens,
-        )
+        context_errors: list[str] = []
+        budgets = self._prompt_retry_budgets(prompt_budget_chars)
+        for index, budget in enumerate(budgets):
+            fitted_user = self._fit_prompt_text(
+                user,
+                max_chars=budget,
+                label="the prompt",
+            )
+            try:
+                return await provider.chat(
+                    messages=[
+                        LLMMessage(role="system", content=system),
+                        LLMMessage(role="user", content=fitted_user),
+                    ],
+                    temperature=temperature,
+                    timeout_ms=timeout_ms,
+                    max_tokens=max_tokens,
+                )
+            except Exception as exc:
+                if not self._is_context_budget_error(exc) or index == len(budgets) - 1:
+                    if context_errors:
+                        raise RuntimeError(
+                            "Model context budget retries failed: "
+                            + "; ".join(context_errors + [self._error_detail(exc)])
+                        ) from exc
+                    raise
+                context_errors.append(f"budget={budget}: {self._error_detail(exc)}")
+        raise RuntimeError("Model context budget retries failed before a provider response was returned")
 
     def _document_text(self, document: dict[str, Any], *, max_chars: int = 1600) -> str:
         return (document.get("content") or document.get("snippet") or "")[:max_chars]
@@ -147,6 +187,42 @@ class SynthesizeService:
                 }
             )
         return citations
+
+    def build_source_review(
+        self,
+        *,
+        query: str,
+        documents: list[dict[str, Any]],
+        reason: str,
+    ) -> dict[str, Any]:
+        citations = self._research_citations(documents)
+        source_notes = self._extractive_batch_synopsis(
+            documents=documents,
+            start_index=1,
+            error=reason,
+        )
+        if source_notes.strip():
+            answer = (
+                "LLM synthesis is off or unavailable, so HyperSearch returned a source review instead.\n\n"
+                f"Query: {query}\n\n"
+                f"{source_notes}"
+            )
+        else:
+            answer = (
+                "LLM synthesis is off or unavailable, and no source text was available to review. "
+                "Search still ran, but HyperSearch did not have enough fetched or extracted material to summarize."
+            )
+        return {
+            "answer": answer,
+            "citations": citations,
+            "provider": "search-only",
+            "model": None,
+            "error": reason,
+            "research_steps": {
+                "source_count": len(documents),
+                "mode": "search-only-fallback",
+            },
+        }
 
     def _research_evidence_block(
         self,
@@ -181,24 +257,38 @@ class SynthesizeService:
         context: str | None = None,
         provider_name: str | None = None,
     ) -> dict[str, Any]:
-        provider = self.provider_service.resolve(provider_name)
+        if not self.provider_service.is_llm_enabled():
+            return {
+                "title": self._clean_session_title(query, query),
+                "provider": "search-only",
+                "model": None,
+            }
         prompt = (
             "Please name this active search session by topic using 48 characters or less.\n"
             "Return only the title. Do not add quotes, bullets, punctuation decoration, or explanations.\n\n"
             f"User query: {query}\n\n"
             f"Context:\n{(context or '')[:4000]}"
         )
-        completion = await self._chat(
-            provider=provider,
-            system="You create short, specific titles for local research sessions.",
-            user=prompt,
-            temperature=0.1,
-        )
-        return {
-            "title": self._clean_session_title(completion.content, query),
-            "provider": completion.provider,
-            "model": completion.model,
-        }
+        try:
+            await self.provider_service.ensure_model_available(provider_name)
+            provider = self.provider_service.resolve(provider_name)
+            completion = await self._chat(
+                provider=provider,
+                system="You create short, specific titles for local research sessions.",
+                user=prompt,
+                temperature=0.1,
+            )
+            return {
+                "title": self._clean_session_title(completion.content, query),
+                "provider": completion.provider,
+                "model": completion.model,
+            }
+        except Exception:
+            return {
+                "title": self._clean_session_title(query, query),
+                "provider": "search-only",
+                "model": None,
+            }
 
     async def _summarize_research_material(
         self,
@@ -206,17 +296,28 @@ class SynthesizeService:
         provider,
         query: str,
         documents: list[dict[str, Any]],
+        timeout_ms: int | None = None,
     ) -> tuple[list[str], dict[str, Any]]:
         if not documents:
             return [], {"compact_mode": False, "failed_batches": [], "consolidation_error": None}
         compact_mode = len(documents) >= LARGE_RESEARCH_DOCUMENT_THRESHOLD
         chunk_size = COMPACT_RESEARCH_BATCH_SIZE if compact_mode else RESEARCH_BATCH_SIZE
         source_chars = COMPACT_RESEARCH_SOURCE_CHARS if compact_mode else RESEARCH_BATCH_SOURCE_CHARS
+        batch_timeout_ms = self._model_call_timeout(
+            requested_ms=timeout_ms,
+            minimum_ms=BATCH_SUMMARY_TIMEOUT_MS,
+        )
+        final_timeout_ms = self._model_call_timeout(
+            requested_ms=timeout_ms,
+            minimum_ms=SYNTHESIS_TIMEOUT_MS,
+        )
         synopses: list[str] = []
         meta: dict[str, Any] = {
             "compact_mode": compact_mode,
             "batch_size": chunk_size,
             "batch_source_chars": source_chars,
+            "batch_timeout_ms": batch_timeout_ms,
+            "consolidation_timeout_ms": final_timeout_ms,
             "failed_batches": [],
             "consolidation_error": None,
         }
@@ -241,7 +342,7 @@ class SynthesizeService:
                     system="You turn source material into compact, cited research notes without inventing facts.",
                     user=prompt,
                     temperature=0.15,
-                    timeout_ms=BATCH_SUMMARY_TIMEOUT_MS,
+                    timeout_ms=batch_timeout_ms,
                     max_tokens=BATCH_SUMMARY_MAX_TOKENS,
                 )
                 synopsis = completion.content.strip()
@@ -289,7 +390,7 @@ class SynthesizeService:
                     f"Batch synopses:\n{combined}"
                 ),
                 temperature=0.15,
-                timeout_ms=SYNTHESIS_TIMEOUT_MS,
+                timeout_ms=final_timeout_ms,
                 max_tokens=CONSOLIDATION_MAX_TOKENS,
             )
             content = consolidation.content.strip()
@@ -300,7 +401,14 @@ class SynthesizeService:
             meta["consolidation_error"] = self._error_detail(exc)
             return [combined], meta
 
-    async def _refine_research_question(self, *, provider, query: str, synopsis: str) -> str:
+    async def _refine_research_question(
+        self,
+        *,
+        provider,
+        query: str,
+        synopsis: str,
+        timeout_ms: int | None = None,
+    ) -> str:
         completion = await self._chat(
             provider=provider,
             system="You clarify research questions while preserving the user's intent.",
@@ -311,7 +419,10 @@ class SynthesizeService:
                 f"Evidence brief:\n{self._fit_prompt_text(synopsis, max_chars=QUESTION_REFINEMENT_CHARS, label='evidence brief')}"
             ),
             temperature=0.1,
-            timeout_ms=BATCH_SUMMARY_TIMEOUT_MS,
+            timeout_ms=self._model_call_timeout(
+                requested_ms=timeout_ms,
+                minimum_ms=BATCH_SUMMARY_TIMEOUT_MS,
+            ),
             max_tokens=QUESTION_REFINEMENT_MAX_TOKENS,
         )
         return completion.content.strip() or query
@@ -334,6 +445,17 @@ class SynthesizeService:
             "Evidence:\n"
             + "\n".join(excerpts)
         )
+        if not self.provider_service.is_llm_enabled():
+            return {
+                "summary": self._extractive_search_summary(
+                    query=query,
+                    results=results,
+                    error="LLM features are disabled",
+                ),
+                "provider": "search-only",
+                "model": None,
+                "error": "LLM features are disabled",
+            }
         try:
             provider = self.provider_service.resolve(provider_name)
             completion = await self._chat(
@@ -370,6 +492,7 @@ class SynthesizeService:
         query: str,
         documents: list[dict[str, Any]],
         provider_name: str | None = None,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
         citations = self._research_citations(documents)
         provider = None
@@ -379,6 +502,7 @@ class SynthesizeService:
                 provider=provider,
                 query=query,
                 documents=documents,
+                timeout_ms=timeout_ms,
             )
             compact_mode = bool(summary_meta.get("compact_mode"))
             untrimmed_evidence_brief = "\n\n".join(synopses)
@@ -393,6 +517,7 @@ class SynthesizeService:
                     provider=provider,
                     query=query,
                     synopsis=evidence_brief,
+                    timeout_ms=timeout_ms,
                 )
             except Exception as exc:
                 question_refinement_error = self._error_detail(exc)
@@ -408,14 +533,19 @@ class SynthesizeService:
                 "refined_question": refined_question,
                 "question_refinement_error": question_refinement_error,
                 "summary_meta": summary_meta,
-                "prompt_budget": {
-                    "max_chat_user_chars": MAX_CHAT_USER_CHARS,
-                    "batch_size": summary_meta.get("batch_size"),
-                    "batch_source_chars": summary_meta.get("batch_source_chars"),
-                    "compact_mode": compact_mode,
-                    "untrimmed_evidence_brief_chars": len(untrimmed_evidence_brief),
-                    "final_evidence_brief_chars": len(evidence_brief),
-                    "source_list_chars": len(source_list),
+                    "prompt_budget": {
+                        "max_chat_user_chars": MAX_CHAT_USER_CHARS,
+                        "context_retry_prompt_chars": list(CONTEXT_RETRY_PROMPT_CHARS),
+                        "batch_size": summary_meta.get("batch_size"),
+                        "batch_source_chars": summary_meta.get("batch_source_chars"),
+                        "compact_mode": compact_mode,
+                        "provider_call_timeout_ms": self._model_call_timeout(
+                            requested_ms=timeout_ms,
+                            minimum_ms=SYNTHESIS_TIMEOUT_MS,
+                        ),
+                        "untrimmed_evidence_brief_chars": len(untrimmed_evidence_brief),
+                        "final_evidence_brief_chars": len(evidence_brief),
+                        "source_list_chars": len(source_list),
                 },
             }
             try:
@@ -439,7 +569,10 @@ class SynthesizeService:
                         + source_list
                     ),
                     temperature=0.2,
-                    timeout_ms=SYNTHESIS_TIMEOUT_MS,
+                    timeout_ms=self._model_call_timeout(
+                        requested_ms=timeout_ms,
+                        minimum_ms=SYNTHESIS_TIMEOUT_MS,
+                    ),
                     max_tokens=FINAL_ANSWER_MAX_TOKENS,
                 )
                 answer = completion.content.strip()

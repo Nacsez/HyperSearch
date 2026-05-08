@@ -13,15 +13,37 @@ class ProviderInfo(BaseModel):
     is_default: bool = False
     healthy: bool | None = None
     detail: str | None = None
+    generation_ok: bool | None = None
+    model_available: bool | None = None
+    latency_ms: int | None = None
+    models: list[str] | None = None
 
 
 class ProviderTestRequest(BaseModel):
     name: str = Field(min_length=1)
+    provider_type: str = Field(default="openai-compatible", pattern="^openai-compatible$")
+    base_url: str | None = Field(default=None, max_length=300)
+    model: str | None = Field(default=None, max_length=200)
+    enabled: bool | None = None
+
+
+class ProviderDraftSettings(BaseModel):
+    provider_type: str = Field(default="openai-compatible", pattern="^openai-compatible$")
+    base_url: str | None = Field(default=None, max_length=300)
+    model: str | None = Field(default=None, max_length=200)
+    enabled: bool | None = None
 
 
 class ProviderTestResponse(BaseModel):
     ok: bool
     detail: str
+    provider: str | None = None
+    base_url: str | None = None
+    model: str | None = None
+    model_available: bool | None = None
+    generation_ok: bool | None = None
+    latency_ms: int | None = None
+    models: list[str] | None = None
 
 
 class ProviderModelsResponse(BaseModel):

@@ -51,9 +51,15 @@ def _is_trusted_private_proxy(request: Request) -> bool:
     if proxy_marker != "caddy" or not client_host:
         return False
     try:
-        return ipaddress.ip_address(client_host).is_private
+        address = ipaddress.ip_address(client_host)
     except ValueError:
         return False
+    if address.is_loopback:
+        return True
+    # The desktop-managed Caddy proxy reaches the API over Docker bridge
+    # addresses. Do not trust arbitrary RFC1918 LAN clients that spoof the
+    # proxy marker header.
+    return address in ipaddress.ip_network("172.16.0.0/12")
 
 
 def _is_private_client(request: Request) -> bool:
@@ -104,4 +110,13 @@ async def require_access(request: Request) -> None:
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Pairing token required for LAN access",
+    )
+
+
+async def require_local_access(request: Request) -> None:
+    if _is_local_request(request):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="This administrative operation is only available from the local HyperSearch app.",
     )

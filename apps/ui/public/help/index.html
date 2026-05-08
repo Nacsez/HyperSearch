@@ -21,6 +21,7 @@
         --accent-strong: #7f2f08;
         --success: #2f7d56;
         --shadow: 0 22px 50px rgba(91, 58, 25, 0.14);
+        --help-zoom: 1;
       }
 
       * {
@@ -45,9 +46,49 @@
       }
 
       .page {
-        max-width: 1120px;
+        width: min(1120px, calc((100vw - 40px) / var(--help-zoom)));
+        max-width: none;
         margin: 0 auto;
         padding: 28px 20px 56px;
+        zoom: var(--help-zoom);
+      }
+
+      .help-toolbar {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 10;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface-strong);
+        box-shadow: 0 12px 28px rgba(91, 58, 25, 0.16);
+        padding: 6px;
+      }
+
+      .help-toolbar button {
+        min-width: 34px;
+        min-height: 32px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 800;
+      }
+
+      .help-toolbar button:hover {
+        background: rgba(178, 77, 25, 0.1);
+      }
+
+      .help-toolbar span {
+        min-width: 54px;
+        text-align: center;
+        color: var(--muted);
+        font-weight: 800;
       }
 
       .hero,
@@ -87,7 +128,7 @@
       h3 {
         margin: 0;
         font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-        letter-spacing: -0.02em;
+        letter-spacing: 0;
       }
 
       h1 {
@@ -235,6 +276,13 @@
       }
 
       @media (max-width: 960px) {
+        .help-toolbar {
+          position: sticky;
+          top: 8px;
+          margin: 8px 8px 0 auto;
+          width: max-content;
+        }
+
         .layout {
           grid-template-columns: 1fr;
         }
@@ -250,29 +298,35 @@
     </style>
   </head>
   <body>
+    <div class="help-toolbar" aria-label="Help page zoom">
+      <button type="button" data-zoom-action="out" aria-label="Zoom out">-</button>
+      <span id="help-zoom-label">100%</span>
+      <button type="button" data-zoom-action="in" aria-label="Zoom in">+</button>
+    </div>
     <div class="page">
       <header class="hero">
         <p class="eyebrow">HyperSearch Help</p>
-        <h1>Operator Guide</h1>
+        <h1>User Guide</h1>
         <p>
-          This page is the shipped help system for HyperSearch. It explains the UI fields, preset workflow,
-          headless API usage, installation, deployment, and a practical validation checklist.
+          Welcome to HyperSearch. This guide explains how to start the local stack, run search and research sessions,
+          save your work, manage local model settings, and use diagnostics when something needs attention.
         </p>
         <div class="chip-row">
-          <span class="chip">UI + API</span>
+          <span class="chip">Desktop + Web UI</span>
           <span class="chip">Local-first</span>
-          <span class="chip">Local models only</span>
-          <span class="chip">Repository-owned documentation</span>
+          <span class="chip">Search-only supported</span>
+          <span class="chip">Local models optional</span>
         </div>
         <nav class="nav" aria-label="Quick links">
           <a href="#what-it-does">What It Does</a>
+          <a href="#quick-start">Quick Start</a>
           <a href="#field-reference">Field Reference</a>
           <a href="#presets">Presets</a>
-          <a href="#xml-export">XML Export</a>
-          <a href="#ui-exercises">UI Exercises</a>
+          <a href="#xml-export">Save Sessions</a>
+          <a href="#research-metrics">Research Metrics</a>
           <a href="#headless">Headless</a>
           <a href="#install">Install</a>
-          <a href="#testing">Testing</a>
+          <a href="#troubleshooting">Troubleshooting</a>
         </nav>
       </header>
 
@@ -307,25 +361,24 @@
             </div>
           </section>
 
-          <section class="card section-stack">
+          <section class="card section-stack" id="quick-start">
             <div>
-              <p class="eyebrow">Observed Behavior</p>
-              <h2>What The Recent Logs Show</h2>
+              <p class="eyebrow">Start Here</p>
+              <h2>Quick Start</h2>
             </div>
             <ul class="plain-list">
-              <li>Basic search requests are healthy and usually completed in about 1.0 to 1.1 seconds for simple runs.</li>
-              <li>Broader search runs with more payload or more engines were closer to 3.3 to 3.8 seconds.</li>
-              <li>Provider health tests against LM Studio completed successfully in about 3.8 to 5.2 seconds.</li>
-              <li>Research runs varied a lot: one completed in about 6.3 seconds, while a deeper run took about 49.2 seconds.</li>
-              <li>Some target sites returned <code>403 Forbidden</code> during fetch and extract. That is expected on parts of the public web and should not be treated as a HyperSearch failure by itself.</li>
-              <li>Trafilatura occasionally logged <code>discarding data: None</code>. That is a recoverable extraction edge case, not a crash.</li>
-              <li>Caddy access logs showed clean end-to-end proxying with request IDs and trace IDs preserved on API responses.</li>
+              <li>Open HyperSearch Desktop and select <strong>Start</strong>. The launcher waits until API, UI, SearXNG, Valkey, and Caddy are ready.</li>
+              <li>Select <strong>New Session</strong> after the stack reports ready.</li>
+              <li>Run a regular search first when you want links, snippets, and fetched source material.</li>
+              <li>Use <strong>Research Synthesis</strong> when you want HyperSearch to review collected sources and prepare a cited answer.</li>
+              <li>Use <strong>Save Session</strong> to write an XML session archive and place it in the Session Library.</li>
+              <li>Open <strong>Operations</strong> to review readiness, enable or disable LLM features, discover loaded models, and test the active provider.</li>
             </ul>
             <div class="callout">
-              <strong>Operational takeaway:</strong>
+              <strong>Search-only use is valid:</strong>
               <p>
-                Search latency is currently good. Research latency depends heavily on the target pages and fetchability.
-                Your test plan should therefore cover both fast, cooperative sources and slower or blocked sources.
+                HyperSearch can run without LM Studio or any other model provider. Search remains available, and research
+                requests return a source review when model synthesis is off or unavailable.
               </p>
             </div>
           </section>
@@ -385,7 +438,7 @@
                   <td><code>Research Sources</code></td>
                   <td>Research</td>
                   <td>How many collected search hits to fetch, summarize, and synthesize.</td>
-                  <td>Start around <code>3</code> to <code>5</code>. The default 1.0 bound is <code>250</code>; large values can make research much slower.</td>
+                  <td>Start around <code>3</code> to <code>5</code>. Larger values are supported, but research can take substantially longer because sources are processed in batches.</td>
                 </tr>
                 <tr>
                   <td><code>Safe Search</code></td>
@@ -432,8 +485,8 @@
                 <tr>
                   <td><code>Timeout (ms)</code></td>
                   <td>Search, Research</td>
-                  <td>Request timeout budget.</td>
-                  <td>Raise this for heavy research runs. A short timeout is a good stress test input.</td>
+                  <td>Search collection budget and model-call guidance for long research requests.</td>
+                  <td>Use a larger value for heavy research. HyperSearch still uses provider-level timeouts so a local model can finish long synthesis work reliably.</td>
                 </tr>
               </tbody>
             </table>
@@ -452,9 +505,8 @@
               <h2>Presets And Profiles</h2>
             </div>
             <p>
-              The current UI uses a preset system. If you think of these as search profiles, that is the right mental
-              model. A preset stores the current request shape so you can re-run common tasks without re-entering all
-              fields.
+              Presets store a reusable search and research request shape. Use them when you regularly repeat the same
+              kind of search, source count, safety setting, provider choice, or cache policy.
             </p>
             <ul class="plain-list">
               <li>Set the fields you want in the search form.</li>
@@ -462,6 +514,7 @@
               <li>Give the preset a descriptive name such as <code>Recent news sweep</code> or <code>Wikipedia fact check</code>.</li>
               <li>Use the saved preset chips at the bottom of the search form to load it later.</li>
               <li>After loading a preset, you can still change individual fields before running the next request.</li>
+              <li>Mark one preset as default when you want new sessions to open with that profile already selected.</li>
             </ul>
             <div class="callout">
               <strong>Recommended naming pattern:</strong>
@@ -475,12 +528,13 @@
           <section class="card section-stack" id="xml-export">
             <div>
               <p class="eyebrow">Export</p>
-              <h2>Session XML Export</h2>
+              <h2>Save Sessions</h2>
             </div>
             <p>
-              Session XML export is meant for durable personal archives, notebook ingestion, and downstream automation.
-              Browser sessions download the XML through the browser. Embedded desktop sessions hand the XML to the
-              desktop shell, which writes the file into the export folder configured in desktop settings.
+              <strong>Save Session</strong> writes the current session as XML and adds it to the Session Library. The XML
+              format is useful for durable personal archives, notebook ingestion, and downstream automation. Browser
+              sessions download the XML through the browser. Embedded desktop sessions hand the XML to the desktop shell,
+              which writes the file into the export folder configured in desktop settings.
             </p>
             <div class="grid-two">
               <div class="section-stack">
@@ -508,36 +562,35 @@
             </div>
           </section>
 
-          <section class="card section-stack" id="ui-exercises">
+          <section class="card section-stack" id="research-metrics">
             <div>
-              <p class="eyebrow">Exercises</p>
-              <h2>UI Walkthroughs</h2>
+              <p class="eyebrow">Research Results</p>
+              <h2>Reading Metrics</h2>
             </div>
             <div class="grid-two">
               <div class="section-stack">
-                <h3>Exercise 1: Basic search in the UI</h3>
-                <ol class="plain-list">
-                  <li>Open the main app at <code>http://127.0.0.1:8090/</code>.</li>
-                  <li>Enter <code>history of cincinnati ohio</code> as the query.</li>
-                  <li>Set <code>Results to Collect</code> to <code>10</code>.</li>
-                  <li>Leave cache policy at <code>use</code> for the first run.</li>
-                  <li>Click <strong>Run Search</strong>.</li>
-                  <li>Verify that the workspace shows result count, request ID, result cards, and cache state.</li>
-                  <li>Open <strong>Verbose log</strong> and confirm the raw payload for the request exists.</li>
-                </ol>
+                <h3>Search source counts</h3>
+                <ul class="plain-list">
+                  <li><strong>Search Sources Requested</strong> is the number of search results HyperSearch attempted to collect from SearXNG.</li>
+                  <li><strong>Search Sources Retrieved</strong> is the number of search results returned after paging, ranking, and deduplication.</li>
+                  <li>A smaller retrieved value can happen when the search engine does not provide enough unique results for the request.</li>
+                </ul>
               </div>
               <div class="section-stack">
-                <h3>Exercise 2: Research synthesis in the UI</h3>
-                <ol class="plain-list">
-                  <li>Set query to <code>origin of ronald mcdonald</code>.</li>
-                  <li>Set <code>Research Sources = 3</code> for a moderate run.</li>
-                  <li>Optionally open advanced controls and set a larger timeout such as <code>60000</code>.</li>
-                  <li>Click <strong>Research Synthesis</strong>.</li>
-                  <li>Verify that the answer panel fills in above the collected source list.</li>
-                  <li>Check that an answer appears with numbered citations and a trace summary.</li>
-                  <li>Open the debug trace details and verify the request completed even if some pages were blocked.</li>
-                </ol>
+                <h3>Research source counts</h3>
+                <ul class="plain-list">
+                  <li><strong>Research Sources Requested</strong> is the number of collected search hits HyperSearch attempted to fetch, extract, and review.</li>
+                  <li><strong>Research Sources Retrieved</strong> is the number of usable source documents included in the answer or source review.</li>
+                  <li><strong>Research Source Shortfall</strong> shows the gap when pages are blocked, empty, duplicated, or otherwise unavailable for extraction.</li>
+                </ul>
               </div>
+            </div>
+            <div class="callout">
+              <strong>Citations and sources:</strong>
+              <p>
+                The numbered sources under <strong>Sources Used</strong> are the citation set for the research answer.
+                HyperSearch uses that single source count in the metrics panel to avoid duplicate citation and document-count labels.
+              </p>
             </div>
           </section>
 
@@ -681,9 +734,9 @@ curl -s http://127.0.0.1:8090/v1/research \
             </div>
             <div class="grid-two">
               <div class="section-stack">
-                <h3>Release candidate install</h3>
+                <h3>Standard install</h3>
                 <ol class="plain-list">
-                  <li>Use the full installer media for private beta tests whenever possible.</li>
+                  <li>Use the full installer media whenever you want the most predictable offline setup path.</li>
                   <li>Run <code>HyperSearch_1.0.0_x64-setup.exe</code> from the media folder.</li>
                   <li>If <code>payload\images</code> is present, setup loads Docker images locally with <code>docker load</code>.</li>
                   <li>If no image archive is present, setup uses online mode and pulls prebuilt images.</li>
@@ -693,13 +746,13 @@ curl -s http://127.0.0.1:8090/v1/research \
                 </ol>
               </div>
               <div class="section-stack">
-                <h3>Local development</h3>
+                <h3>Developer startup</h3>
                 <ol class="plain-list">
                   <li>Create a Python virtual environment and install the API package from <code>apps/api</code>.</li>
                   <li>Install UI dependencies in <code>apps/ui</code> with <code>npm install</code>.</li>
                   <li>Run the API with Uvicorn on <code>127.0.0.1:8000</code>.</li>
                   <li>Run the UI with <code>npm run dev</code> on <code>127.0.0.1:5173</code>.</li>
-                  <li>For Compose release mode, run <code>docker compose --project-name hypersearch up -d</code>.</li>
+                  <li>For Compose release mode, run <code>.\scripts\Deploy-HyperSearch.cmd -Action up</code>.</li>
                   <li>For local image builds, add <code>-f docker-compose.yml -f docker-compose.dev.yml up -d --build</code>.</li>
                 </ol>
               </div>
@@ -710,6 +763,7 @@ curl -s http://127.0.0.1:8090/v1/research \
                 <ul class="plain-list">
                   <li>Setup detects Docker Desktop and can guide installation when missing.</li>
                   <li>Startup requires a clean Docker engine version response.</li>
+                  <li>The desktop launcher waits for API, UI/Caddy, SearXNG, Valkey, <code>/v1/live</code>, and search readiness before sessions open.</li>
                   <li>Online media requires registry/DNS/proxy access for image pulls.</li>
                   <li>Full media can start without registry access after images are loaded.</li>
                 </ul>
@@ -717,10 +771,11 @@ curl -s http://127.0.0.1:8090/v1/research \
               <div class="section-stack">
                 <h3>LM Studio and models</h3>
                 <ul class="plain-list">
+                  <li>Search-only is supported. Research becomes source review when LLM features are off or unavailable.</li>
                   <li>Research synthesis requires a local OpenAI-compatible endpoint.</li>
                   <li>Docker-managed HyperSearch usually reaches LM Studio at <code>http://host.docker.internal:1234</code>.</li>
                   <li>Low-resource systems may be configured as search-only until a suitable model is selected.</li>
-                  <li>Use <strong>Operations</strong> to discover loaded models, select a model, save the provider, and run a provider test.</li>
+                  <li>Use <strong>Operations</strong> to toggle LLM features, discover loaded models, select a model, and test or verify it before saving the provider.</li>
                 </ul>
               </div>
             </div>
@@ -736,76 +791,57 @@ curl -s http://127.0.0.1:8090/v1/research \
               <p>
                 Installer logs, setup summaries, desktop logs, and full command logs are written under
                 <code>%LOCALAPPDATA%\HyperSearch\logs</code>. Use desktop <strong>Settings &gt; Export Diagnostics</strong>
-                before filing a beta issue report.
+                when you need a support bundle. Diagnostics redact token, key, password, auth, and credential values.
               </p>
             </div>
           </section>
 
-          <section class="card section-stack" id="testing">
+          <section class="card section-stack" id="troubleshooting">
             <div>
-              <p class="eyebrow">Validation</p>
-              <h2>Thorough Testing Plan</h2>
+              <p class="eyebrow">Support</p>
+              <h2>Troubleshooting And Validation</h2>
             </div>
-            <h3>Phase 1: Stack health</h3>
-            <ol class="checklist">
-              <li>Open the UI and confirm the shell loads without layout breakage.</li>
-              <li>Open the help page from the <strong>Help</strong> button and verify it loads in a browser tab or a desktop session titled <strong>Help</strong>.</li>
-              <li>Open <strong>Operations</strong> and run a provider test.</li>
-              <li>Verify provider status is healthy and response time is within a reasonable few-second range.</li>
-              <li>Confirm the verbose log records admin events.</li>
-            </ol>
-            <h3>Phase 2: Core search behavior</h3>
-            <ol class="checklist">
-              <li>Run a simple factual search with cache policy <code>use</code>.</li>
-              <li>Run the same search again and verify a more cache-heavy result path.</li>
-              <li>Run again with cache policy <code>bypass</code> and confirm it still succeeds.</li>
-              <li>Toggle <code>Dedupe</code> off and compare the number and similarity of results.</li>
-              <li>Change <code>Results to Collect</code> from 5 to 20 and verify payload size and UI handling remain solid.</li>
-              <li>Use advanced controls to restrict engines and categories, then verify the returned result mix changes.</li>
-            </ol>
-            <h3>Phase 3: Fetch and extract behavior</h3>
-            <ol class="checklist">
-              <li>Run search with <code>Fetch pages</code> enabled on a cooperative source like Wikipedia.</li>
-              <li>Run search with <code>Fetch pages</code> and <code>Extract text</code> enabled.</li>
-              <li>Confirm some result cards show fetched and extracted markers.</li>
-              <li>Repeat with a more hostile query that is likely to include blocked domains and confirm the request still completes.</li>
-            </ol>
-            <h3>Phase 4: Research behavior</h3>
-            <ol class="checklist">
-              <li>Run a short research request with <code>Research Sources = 2</code> or <code>3</code>.</li>
-              <li>Confirm answer text, citation cards, and trace summary all appear.</li>
-              <li>Run the same research again with <code>refresh</code> cache policy.</li>
-              <li>Raise <code>Research Sources</code> and timeout to simulate a slower research path.</li>
-              <li>Verify long-running research still completes and the UI remains usable while waiting.</li>
-            </ol>
-            <h3>Phase 5: Headless API checks</h3>
-            <ol class="checklist">
-              <li>Run the search PowerShell example from this page and confirm a <code>request_id</code> is returned.</li>
-              <li>Run the research PowerShell example and verify citations plus trace fields are present.</li>
-              <li>Capture one response and verify request IDs in the payload line up with the API logs.</li>
-              <li>If you plan LAN access, repeat the same calls with <code>X-HyperSearch-Token</code> set.</li>
-            </ol>
-            <h3>Phase 6: Regression passes</h3>
-            <ol class="checklist">
-              <li>Save a preset, reload it, and verify fields rehydrate correctly.</li>
-              <li>Toggle light and dark mode and confirm the drawer and workspace remain readable.</li>
-              <li>Resize the browser to a narrower width and verify controls and drawers stay usable.</li>
-              <li>Use the verbose log after several actions and confirm event selection still maps to the right payload.</li>
-            </ol>
+            <div class="grid-two">
+              <div class="section-stack">
+                <h3>When startup does not complete</h3>
+                <ul class="plain-list">
+                  <li>Open the desktop launcher and select <strong>Refresh</strong> to rerun Docker and readiness checks.</li>
+                  <li>Open <strong>Logs</strong> to review Docker Compose output from API, UI, Caddy, SearXNG, and Valkey.</li>
+                  <li>Confirm Docker Desktop is running and that your Windows user can access the Docker engine.</li>
+                  <li>Use <strong>Settings &gt; Export Diagnostics</strong> if you need to share a redacted support bundle.</li>
+                </ul>
+              </div>
+              <div class="section-stack">
+                <h3>When research cannot synthesize</h3>
+                <ul class="plain-list">
+                  <li>Open <strong>Operations</strong> and confirm LLM features are enabled if you want model synthesis.</li>
+                  <li>Discover models from the provider endpoint, select the loaded model, then run <strong>Test</strong> or <strong>Verify</strong>.</li>
+                  <li>If no model is available, continue in search-only mode. Research will return a source review instead of an error.</li>
+                  <li>For large research runs, raise <strong>Timeout (ms)</strong> and expect HyperSearch to process sources in batches.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Useful validation loop:</strong>
+              <p>
+                Run a small search, save the session, run a small research request, increase the source counts, and then
+                export diagnostics if anything fails. This confirms the stack, UI, source collection, model path, session
+                saving, and logging path in one pass.
+              </p>
+            </div>
           </section>
 
           <section class="card section-stack">
             <div>
-              <p class="eyebrow">Maintainers</p>
-              <h2>Updating This Help Page</h2>
+              <p class="eyebrow">Guide</p>
+              <h2>About This Help Page</h2>
             </div>
             <p>
-              This help system is part of the repository and ships with the UI build. Edit
-              <code>apps/ui/public/help/index.html</code> whenever a field, workflow, deployment step, or operator
-              expectation changes.
+              This help page ships with HyperSearch and is available from the desktop launcher and from web sessions.
+              It is written for everyday use, including search-only systems and systems with a local model provider.
             </p>
             <p class="footer-note">
-              Keep the API examples aligned with the live schemas in the backend and the field labels aligned with the React UI.
+              Use the zoom controls in the upper-right corner or hold Ctrl while scrolling to adjust the page size.
             </p>
           </section>
         </main>
@@ -817,11 +853,11 @@ curl -s http://127.0.0.1:8090/v1/research \
               <h3>Most common operator loop</h3>
             </div>
             <ol class="plain-list">
-              <li>Confirm provider health.</li>
+              <li>Start the stack.</li>
               <li>Run search first.</li>
               <li>Inspect results.</li>
-              <li>Escalate to research only when you need synthesis.</li>
-              <li>Use verbose log when you need raw payloads.</li>
+              <li>Run research when you need a cited answer or source review.</li>
+              <li>Save the session when you want a durable archive.</li>
             </ol>
           </section>
 
@@ -833,7 +869,8 @@ curl -s http://127.0.0.1:8090/v1/research \
             <ul class="plain-list">
               <li>Some pages on the web will block automated fetches with 403 responses.</li>
               <li>Provider tests are usually slower than search because they hit the local model backend.</li>
-              <li>Research duration can jump sharply when top N is high or sources are heavy.</li>
+              <li>Research duration can increase sharply when source counts are high or pages are heavy.</li>
+              <li>Search-only mode is normal when no local model is configured.</li>
             </ul>
           </section>
 
@@ -847,5 +884,42 @@ curl -s http://127.0.0.1:8090/v1/research \
         </aside>
       </div>
     </div>
+    <script>
+      (() => {
+        const key = "hypersearch_help_zoom";
+        const min = 0.5;
+        const max = 2;
+        const step = 0.05;
+        const label = document.getElementById("help-zoom-label");
+        const clamp = (value) => Math.min(max, Math.max(min, Number.isFinite(value) ? value : 1));
+        let zoom = clamp(Number(window.localStorage.getItem(key) || "1"));
+        const applyZoom = () => {
+          document.documentElement.style.setProperty("--help-zoom", String(zoom));
+          if (label) {
+            label.textContent = `${Math.round(zoom * 100)}%`;
+          }
+          try {
+            window.localStorage.setItem(key, String(zoom));
+          } catch {
+            // Help remains usable when browser storage is unavailable.
+          }
+        };
+        document.querySelectorAll("[data-zoom-action]").forEach((button) => {
+          button.addEventListener("click", () => {
+            zoom = clamp(zoom + (button.getAttribute("data-zoom-action") === "in" ? step : -step));
+            applyZoom();
+          });
+        });
+        window.addEventListener("wheel", (event) => {
+          if (!event.ctrlKey) {
+            return;
+          }
+          event.preventDefault();
+          zoom = clamp(zoom + (event.deltaY < 0 ? step : -step));
+          applyZoom();
+        }, { passive: false });
+        applyZoom();
+      })();
+    </script>
   </body>
 </html>

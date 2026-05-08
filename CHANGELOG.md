@@ -16,3 +16,7 @@
 - Added installer support for bundled Docker image archives, prerequisite payloads, stricter Docker readiness, and setup result summaries.
 - Added desktop command logs, serialized backend actions, fixed Compose project naming, and diagnostics export.
 - Added private release-candidate deployment docs and updated in-app help for installer, diagnostics, local model, XML export, and beta workflows.
+- Added app-level LLM enablement, search-only readiness, source-review research fallback, and reactive draft provider discovery/testing.
+- Improved long research handling with chunked synthesis, request-budget traces, clearer source metrics, and graceful fallback behavior.
+- Polished desktop/session UX for session saving, default search profiles, help zoom, Ctrl+wheel zoom, window-state restore, and narrow-window wrapping.
+- Added beta GitHub distribution notes with upload-ready media asset names and SHA256 checksums.

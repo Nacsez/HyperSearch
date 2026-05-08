@@ -46,6 +46,82 @@ class ProviderService:
         self._seed_defaults()
         self._reload()
 
+    def get_llm_settings(self) -> dict:
+        enabled_record = self.database.get_app_setting("llm_enabled")
+        reason_record = self.database.get_app_setting("llm_disabled_reason")
+        enabled = (
+            bool(enabled_record["value"])
+            if enabled_record is not None
+            else self.settings.llm_enabled
+        )
+        reason = (
+            reason_record["value"]
+            if reason_record is not None
+            else self.settings.llm_disabled_reason
+        )
+        return {
+            "enabled": enabled,
+            "reason": reason if not enabled else None,
+            "source": (
+                enabled_record["source"]
+                if enabled_record is not None
+                else self.settings.llm_settings_source
+            ),
+        }
+
+    def set_llm_settings(self, *, enabled: bool, reason: str | None = None) -> dict:
+        self.database.set_app_setting("llm_enabled", enabled, source="app")
+        self.database.set_app_setting(
+            "llm_disabled_reason",
+            None if enabled else reason,
+            source="app",
+        )
+        return self.get_llm_settings()
+
+    def is_llm_enabled(self) -> bool:
+        return bool(self.get_llm_settings()["enabled"])
+
+    async def llm_capability(self) -> dict:
+        state = self.get_llm_settings()
+        default_name = self.database.get_default_provider_name() or "lmstudio"
+        record = self.database.get_provider_config(default_name)
+        base = {
+            "enabled": bool(state["enabled"]),
+            "ready": False,
+            "mode": "local",
+            "detail": state.get("reason") or "LLM features are disabled",
+            "provider": default_name,
+            "base_url": record.base_url if record else None,
+            "model": record.model if record else None,
+            "models": None,
+        }
+        if not state["enabled"]:
+            base["mode"] = "disabled"
+            return base
+        if record is None:
+            base["detail"] = f"Unknown provider: {default_name}"
+            return base
+        if not record.enabled or not record.base_url:
+            base["detail"] = "Default provider is not configured"
+            return base
+        try:
+            health = await self._provider_health(default_name)
+        except Exception as exc:
+            logger.exception("LLM readiness check failed")
+            base["detail"] = str(exc)
+            return base
+        base.update(
+            {
+                "ready": bool(health.ok),
+                "detail": health.detail,
+                "model_available": health.model_available,
+                "generation_ok": health.generation_ok,
+                "latency_ms": health.latency_ms,
+                "models": health.models,
+            }
+        )
+        return base
+
     def _seed_defaults(self) -> None:
         current_default = self.database.get_default_provider_name() or self.settings.provider_default
         if current_default not in {"lmstudio", "vllm", "llamacpp"}:
@@ -106,6 +182,40 @@ class ProviderService:
                 timeout_ms=self.settings.provider_timeout_ms,
             )
 
+    def _provider_class_for_name(self, name: str) -> type[BaseLLMProvider]:
+        if name == "vllm":
+            return VLLMProvider
+        if name == "llamacpp":
+            return LlamaCppProvider
+        return LMStudioProvider
+
+    def _draft_provider(
+        self,
+        *,
+        name: str,
+        base_url: str | None,
+        model: str | None,
+        enabled: bool,
+    ) -> BaseLLMProvider:
+        if not enabled or not base_url:
+            raise ProviderUnavailableError(
+                f"Local provider is not configured: {name}",
+                details={
+                    "provider": name,
+                    "remediation": "Set a local OpenAI-compatible endpoint before testing.",
+                },
+            )
+        if not _is_local_provider_url(base_url):
+            raise ProviderUnavailableError(
+                "Provider endpoint must be local or private-network scoped",
+                details={"provider": name, "base_url": base_url},
+            )
+        return self._provider_class_for_name(name)(
+            base_url=base_url,
+            model=model,
+            timeout_ms=self.settings.provider_timeout_ms,
+        )
+
     async def _provider_health(self, name: str, *, force: bool = False) -> ProviderHealth:
         if not force:
             cached = self._health_cache.get(name)
@@ -160,22 +270,84 @@ class ProviderService:
             )
         return output
 
-    async def test_provider(self, name: str) -> tuple[bool, str]:
-        try:
-            provider = self.resolve(name)
-        except KeyError as exc:
-            return False, str(exc)
-        health = await self._provider_health(name, force=True)
+    async def test_provider(
+        self,
+        *,
+        name: str,
+        base_url: str | None = None,
+        model: str | None = None,
+        enabled: bool | None = None,
+    ) -> dict:
+        record = self.database.get_provider_config(name)
+        draft_mode = base_url is not None or model is not None or enabled is not None
+        if draft_mode:
+            effective_enabled = True if enabled is None else enabled
+            try:
+                provider = self._draft_provider(
+                    name=name,
+                    base_url=base_url,
+                    model=model,
+                    enabled=effective_enabled,
+                )
+                health = await provider.healthcheck()
+            except Exception as exc:
+                logger.exception("Draft provider test failed")
+                return {
+                    "ok": False,
+                    "detail": str(exc),
+                    "provider": name,
+                    "base_url": base_url,
+                    "model": model,
+                }
+        else:
+            try:
+                provider = self.resolve(name)
+            except KeyError as exc:
+                return {"ok": False, "detail": str(exc), "provider": name}
+            health = await self._provider_health(name, force=True)
+            if record is not None:
+                base_url = record.base_url
+                model = record.model
         if not health.ok:
-            return False, health.detail
+            return {
+                "ok": False,
+                "detail": health.detail,
+                "provider": name,
+                "base_url": base_url,
+                "model": model,
+                "model_available": health.model_available,
+                "generation_ok": health.generation_ok,
+                "latency_ms": health.latency_ms,
+                "models": health.models,
+            }
         try:
             completion = await provider.chat(
                 messages=[LLMMessage(role="user", content="Reply with the single word pong.")],
             )
         except Exception as exc:
             logger.exception("Provider test failed")
-            return False, str(exc)
-        return True, completion.content or "ok"
+            return {
+                "ok": False,
+                "detail": str(exc),
+                "provider": name,
+                "base_url": base_url,
+                "model": model,
+                "model_available": health.model_available,
+                "generation_ok": False,
+                "latency_ms": health.latency_ms,
+                "models": health.models,
+            }
+        return {
+            "ok": True,
+            "detail": completion.content or "ok",
+            "provider": name,
+            "base_url": base_url,
+            "model": completion.model or model,
+            "model_available": health.model_available,
+            "generation_ok": True,
+            "latency_ms": health.latency_ms,
+            "models": health.models,
+        }
 
     async def list_provider_models(self, name: str) -> dict:
         record = self.database.get_provider_config(name)
@@ -206,6 +378,35 @@ class ProviderService:
                 },
             ) from exc
         return {"provider": name, "base_url": record.base_url, "models": models}
+
+    async def list_draft_provider_models(
+        self,
+        *,
+        name: str,
+        base_url: str | None,
+        model: str | None = None,
+        enabled: bool = True,
+    ) -> dict:
+        provider = self._draft_provider(
+            name=name,
+            base_url=base_url,
+            model=model,
+            enabled=enabled,
+        )
+        try:
+            models = await provider.list_models()
+        except Exception as exc:
+            logger.exception("Draft provider model discovery failed")
+            raise ProviderUnavailableError(
+                f"Could not list models from {name}",
+                details={
+                    "provider": name,
+                    "base_url": base_url,
+                    "detail": str(exc),
+                    "remediation": "Start the local provider server and confirm the endpoint exposes /v1/models.",
+                },
+            ) from exc
+        return {"provider": name, "base_url": base_url, "models": models}
 
     async def set_default_provider(self, name: str) -> None:
         try:
@@ -259,7 +460,65 @@ class ProviderService:
         }
 
     async def ensure_model_available(self, name: str | None = None) -> dict:
+        if not self.is_llm_enabled():
+            state = self.get_llm_settings()
+            raise ProviderUnavailableError(
+                "LLM features are disabled",
+                details={
+                    "provider": name,
+                    "reason": state.get("reason"),
+                    "remediation": "Enable LLM features in Operations before running synthesis.",
+                },
+            )
         provider_name = name or self.database.get_default_provider_name() or "lmstudio"
+        return await self.verify_model_available(provider_name)
+
+    async def verify_model_available(
+        self,
+        name: str,
+        *,
+        base_url: str | None = None,
+        model: str | None = None,
+        enabled: bool | None = None,
+    ) -> dict:
+        draft_mode = base_url is not None or model is not None or enabled is not None
+        if draft_mode:
+            provider = self._draft_provider(
+                name=name,
+                base_url=base_url,
+                model=model,
+                enabled=True if enabled is None else enabled,
+            )
+            try:
+                models = await provider.list_models()
+            except Exception as exc:
+                raise ProviderUnavailableError(
+                    f"Could not list models from {name}",
+                    details={
+                        "provider": name,
+                        "base_url": base_url,
+                        "detail": str(exc),
+                        "remediation": "Start the local provider server and confirm the endpoint exposes /v1/models.",
+                    },
+                ) from exc
+            if model and model not in models:
+                raise ProviderModelUnavailableError(
+                    f"Preferred model is not available on {name}: {model}",
+                    details={
+                        "provider": name,
+                        "base_url": base_url,
+                        "preferred_model": model,
+                        "available_models": models,
+                        "remediation": "Load the selected model in the local provider or choose an available model.",
+                    },
+                )
+            return {
+                "provider": name,
+                "base_url": base_url,
+                "model": model,
+                "available_models": models,
+            }
+        provider_name = name
         record = self.database.get_provider_config(provider_name)
         if record is None:
             raise ProviderUnavailableError(

@@ -11,6 +11,7 @@ export interface SearchFormState {
   page: number;
   results_per_page: number;
   max_pages: number;
+  target_results: number;
   safe_search: number;
   dedupe: boolean;
   fetch_pages: boolean;
@@ -26,6 +27,8 @@ export interface SearchFormState {
 interface SearchCommandProps {
   value: SearchFormState;
   busy: boolean;
+  llmEnabled: boolean;
+  llmReady: boolean;
   onChange: (patch: Partial<SearchFormState>) => void;
   onSearch: () => void;
   onResearch: () => void;
@@ -37,6 +40,8 @@ interface SearchSettingsProps {
   providers: ProviderInfo[];
   exportOptions: XmlExportOptions;
   expanded: boolean;
+  llmEnabled: boolean;
+  llmReady: boolean;
   onChange: (patch: Partial<SearchFormState>) => void;
   onExpandedChange: (expanded: boolean) => void;
   onSavePreset: () => void;
@@ -60,7 +65,9 @@ interface XmlExportOptions {
 }
 
 const MAX_RESULTS = 250;
+const MAX_REQUEST_TIMEOUT_MS = 600000;
 const RESULTS_PER_PAGE_LIMIT = 50;
+const SMALL_RESULT_PAGE_SIZE = 10;
 const ENGINE_OPTIONS = [
   "bing",
   "brave",
@@ -84,20 +91,31 @@ function clampNumber(value: number, min: number, max: number) {
 
 function pagingForTotal(total: number) {
   const bounded = clampNumber(total, 1, MAX_RESULTS);
+  const pageSize = bounded <= RESULTS_PER_PAGE_LIMIT
+    ? Math.min(SMALL_RESULT_PAGE_SIZE, bounded)
+    : Math.min(RESULTS_PER_PAGE_LIMIT, bounded);
   return {
     page: 1,
-    results_per_page: Math.min(RESULTS_PER_PAGE_LIMIT, bounded),
-    max_pages: Math.ceil(bounded / RESULTS_PER_PAGE_LIMIT)
+    results_per_page: pageSize,
+    max_pages: Math.ceil(bounded / pageSize)
   };
 }
 
 function totalResults(value: SearchFormState) {
-  return clampNumber(value.results_per_page * value.max_pages, 1, MAX_RESULTS);
+  return clampNumber(
+    Number.isFinite(value.target_results)
+      ? value.target_results
+      : value.results_per_page * value.max_pages,
+    1,
+    MAX_RESULTS
+  );
 }
 
 export function SearchCommand({
   value,
   busy,
+  llmEnabled,
+  llmReady,
   onChange,
   onSearch,
   onResearch
@@ -120,6 +138,10 @@ export function SearchCommand({
     }
     onSearch();
   };
+  const researchLabel = llmEnabled && llmReady ? "Research Synthesis" : "Source Review";
+  const researchHint = llmEnabled && llmReady
+    ? "Enter searches. Ctrl+Enter runs research synthesis with the selected local model."
+    : "Enter searches. Ctrl+Enter runs source review without requiring a local model.";
 
   return (
     <div className="search-command">
@@ -139,10 +161,10 @@ export function SearchCommand({
           {busy ? "Working..." : "Run Search"}
         </button>
         <button type="button" className="button" onClick={onResearch} disabled={busy || !value.query.trim()}>
-          Research Synthesis
+          {researchLabel}
         </button>
       </div>
-      <p className="muted">Enter searches. Ctrl+Enter runs research synthesis with the selected local model.</p>
+      <p className="muted">{researchHint}</p>
     </div>
   );
 }
@@ -153,6 +175,8 @@ export function SearchSettings({
   providers,
   exportOptions,
   expanded,
+  llmEnabled,
+  llmReady,
   onChange,
   onExpandedChange,
   onSavePreset,
@@ -164,23 +188,30 @@ export function SearchSettings({
 }: SearchSettingsProps) {
   const handleText = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value: nextValue } = event.target;
-    if (name === "safe_search" || name === "timeout_ms") {
+    if (name === "safe_search") {
       onChange({ [name]: Number(nextValue) } as Partial<SearchFormState>);
       return;
     }
+    if (name === "timeout_ms") {
+      onChange({ timeout_ms: clampNumber(Number(nextValue), 1000, MAX_REQUEST_TIMEOUT_MS) });
+      return;
+    }
     if (name === "total_results") {
-      const paging = pagingForTotal(Number(nextValue));
+      const targetResults = clampNumber(Number(nextValue), 1, MAX_RESULTS);
+      const paging = pagingForTotal(targetResults);
       onChange({
+        target_results: targetResults,
         ...paging,
-        top_n: Math.min(Math.max(value.top_n, 1), paging.results_per_page * paging.max_pages)
+        top_n: Math.min(Math.max(value.top_n, 1), targetResults)
       });
       return;
     }
     if (name === "top_n") {
       const nextTopN = clampNumber(Number(nextValue), 1, MAX_RESULTS);
+      const targetResults = Math.max(totalResults(value), nextTopN);
       onChange({
         top_n: nextTopN,
-        ...(nextTopN > totalResults(value) ? pagingForTotal(nextTopN) : {})
+        ...(nextTopN > totalResults(value) ? { target_results: targetResults, ...pagingForTotal(targetResults) } : {})
       });
       return;
     }
@@ -189,6 +220,10 @@ export function SearchSettings({
 
   const handleToggle = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = event.target;
+    if (!llmReady && (name === "summarize" || name === "auto_name_session")) {
+      onChange({ [name]: false } as Partial<SearchFormState>);
+      return;
+    }
     onChange({ [name]: checked } as Partial<SearchFormState>);
   };
 
@@ -251,9 +286,15 @@ export function SearchSettings({
         <label><input type="checkbox" name="dedupe" checked={value.dedupe} onChange={handleToggle} /> Dedupe</label>
         <label><input type="checkbox" name="fetch_pages" checked={value.fetch_pages} onChange={handleToggle} /> Fetch pages</label>
         <label><input type="checkbox" name="extract_text" checked={value.extract_text} onChange={handleToggle} /> Extract text</label>
-        <label><input type="checkbox" name="summarize" checked={value.summarize} onChange={handleToggle} /> Search summary</label>
-        <label><input type="checkbox" name="auto_name_session" checked={value.auto_name_session} onChange={handleToggle} /> Auto-name session</label>
+        <label><input type="checkbox" name="summarize" checked={llmReady && value.summarize} onChange={handleToggle} disabled={!llmReady} /> {llmReady ? "Search summary" : "Search summary unavailable"}</label>
+        <label><input type="checkbox" name="auto_name_session" checked={llmReady && value.auto_name_session} onChange={handleToggle} disabled={!llmReady} /> {llmReady ? "Auto-name session" : "Auto-name unavailable"}</label>
       </div> : null}
+
+      {expanded && !llmReady ? (
+        <p className="muted">
+          {llmEnabled ? "LLM features are enabled, but no selected provider/model is ready. Search and source review remain available." : "LLM features are off. Search and source review remain available."}
+        </p>
+      ) : null}
 
       {expanded ? <details className="advanced-panel">
         <summary>Advanced filters and provider controls</summary>
@@ -288,7 +329,7 @@ export function SearchSettings({
             </div>
             <div className="field">
               <label htmlFor="timeout_ms">Timeout (ms)</label>
-              <input id="timeout_ms" name="timeout_ms" type="number" min={1000} step={500} value={value.timeout_ms} onChange={handleText} />
+              <input id="timeout_ms" name="timeout_ms" type="number" min={1000} max={MAX_REQUEST_TIMEOUT_MS} step={500} value={value.timeout_ms} onChange={handleText} />
             </div>
           </div>
           <datalist id="engine-options">

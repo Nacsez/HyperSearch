@@ -66,6 +66,9 @@ class Settings:
     vllm_model: str | None
     llamacpp_base_url: str | None
     llamacpp_model: str | None
+    llm_enabled: bool
+    llm_disabled_reason: str | None
+    llm_settings_source: str
     fetch_timeout_ms: int
     provider_timeout_ms: int
     enable_playwright_fallback: bool
@@ -89,6 +92,21 @@ class Settings:
     def load(cls) -> "Settings":
         root = Path.cwd()
         _load_dotenv(root / ".env")
+        llm_enabled_env = os.getenv("HYPERSEARCH_LLM_ENABLED")
+        research_capability = (
+            os.getenv("HYPERSEARCH_RESEARCH_CAPABILITY") or ""
+        ).strip().lower()
+        llm_enabled = _parse_bool(llm_enabled_env, True)
+        llm_disabled_reason = None
+        llm_settings_source = "default"
+        if llm_enabled_env is not None:
+            llm_settings_source = "env:HYPERSEARCH_LLM_ENABLED"
+            if not llm_enabled:
+                llm_disabled_reason = "Disabled by HYPERSEARCH_LLM_ENABLED=false"
+        if research_capability == "search-only" and llm_enabled_env is None:
+            llm_enabled = False
+            llm_disabled_reason = "Search-only capability mode"
+            llm_settings_source = "env:HYPERSEARCH_RESEARCH_CAPABILITY"
         sqlite_path = _resolve_path(
             os.getenv("HYPERSEARCH_SQLITE_PATH", "./data/hypersearch.db"),
             root=root,
@@ -127,9 +145,12 @@ class Settings:
             vllm_model=os.getenv("HYPERSEARCH_VLLM_MODEL") or None,
             llamacpp_base_url=os.getenv("HYPERSEARCH_LLAMACPP_BASE_URL") or None,
             llamacpp_model=os.getenv("HYPERSEARCH_LLAMACPP_MODEL") or None,
+            llm_enabled=llm_enabled,
+            llm_disabled_reason=llm_disabled_reason,
+            llm_settings_source=llm_settings_source,
             fetch_timeout_ms=_parse_int(os.getenv("HYPERSEARCH_FETCH_TIMEOUT_MS"), 15000),
             provider_timeout_ms=_parse_int(
-                os.getenv("HYPERSEARCH_PROVIDER_TIMEOUT_MS"), 45000
+                os.getenv("HYPERSEARCH_PROVIDER_TIMEOUT_MS"), 180000
             ),
             enable_playwright_fallback=_parse_bool(
                 os.getenv("HYPERSEARCH_ENABLE_PLAYWRIGHT_FALLBACK"), False
@@ -157,7 +178,7 @@ class Settings:
             max_research_top_n=_parse_int(
                 os.getenv("HYPERSEARCH_MAX_RESEARCH_TOP_N"), 250
             ),
-            max_timeout_ms=_parse_int(os.getenv("HYPERSEARCH_MAX_TIMEOUT_MS"), 120000),
+            max_timeout_ms=_parse_int(os.getenv("HYPERSEARCH_MAX_TIMEOUT_MS"), 600000),
         )
 
 

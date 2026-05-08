@@ -6,7 +6,8 @@ use std::{
     env,
     ffi::OsStr,
     fs::{self, OpenOptions},
-    io::Write,
+    io::{Read, Write},
+    net::{TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
     process::Command,
     sync::{
@@ -16,7 +17,10 @@ use std::{
     thread::sleep,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Runtime, Size, Url, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder, Window, WindowEvent,
+};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -42,6 +46,9 @@ struct BackendStatus {
     detail: String,
     app_url: String,
     lan_enabled: bool,
+    services_ok: bool,
+    http_ok: bool,
+    search_ready: bool,
 }
 
 #[derive(Serialize)]
@@ -54,6 +61,18 @@ struct ExportSessionPayload {
     filename: String,
     xml: String,
 }
+
+#[derive(Serialize, Deserialize)]
+struct PersistedWindowState {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
+const MIN_MAIN_WINDOW_WIDTH: u32 = 1100;
+const MIN_MAIN_WINDOW_HEIGHT: u32 = 720;
 
 fn hidden_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
@@ -81,6 +100,88 @@ fn hypersearch_data_root() -> Result<PathBuf, String> {
     let local_app_data =
         env::var("LOCALAPPDATA").map_err(|_| "LOCALAPPDATA is not available".to_string())?;
     Ok(PathBuf::from(local_app_data).join("HyperSearch"))
+}
+
+fn window_state_path() -> Result<PathBuf, String> {
+    Ok(hypersearch_data_root()?.join("window-state.json"))
+}
+
+fn save_main_window_state<R: Runtime>(window: &Window<R>) {
+    let Ok(position) = window.outer_position() else {
+        return;
+    };
+    let Ok(size) = window.outer_size() else {
+        return;
+    };
+    let maximized = window.is_maximized().unwrap_or(false);
+    let state = PersistedWindowState {
+        x: position.x,
+        y: position.y,
+        width: size.width.max(MIN_MAIN_WINDOW_WIDTH),
+        height: size.height.max(MIN_MAIN_WINDOW_HEIGHT),
+        maximized,
+    };
+    let Ok(path) = window_state_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    match serde_json::to_string_pretty(&state) {
+        Ok(contents) => {
+            if let Err(error) = fs::write(&path, contents) {
+                log_desktop_event("window.state.save_error", error.to_string());
+            } else {
+                log_desktop_event(
+                    "window.state.saved",
+                    format!(
+                        "x={} y={} width={} height={} maximized={}",
+                        state.x, state.y, state.width, state.height, state.maximized
+                    ),
+                );
+            }
+        }
+        Err(error) => log_desktop_event("window.state.serialize_error", error.to_string()),
+    }
+}
+
+fn restore_main_window_state<R: Runtime>(window: &WebviewWindow<R>) {
+    let Ok(path) = window_state_path() else {
+        return;
+    };
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(state) = serde_json::from_str::<PersistedWindowState>(&contents) else {
+        log_desktop_event(
+            "window.state.restore_error",
+            format!("unable to parse {}", path.display()),
+        );
+        return;
+    };
+    let width = state.width.max(MIN_MAIN_WINDOW_WIDTH);
+    let height = state.height.max(MIN_MAIN_WINDOW_HEIGHT);
+    if let Err(error) = window.set_size(Size::Physical(PhysicalSize { width, height })) {
+        log_desktop_event("window.state.restore_size_error", error.to_string());
+    }
+    if let Err(error) = window.set_position(Position::Physical(PhysicalPosition {
+        x: state.x,
+        y: state.y,
+    })) {
+        log_desktop_event("window.state.restore_position_error", error.to_string());
+    }
+    if state.maximized {
+        if let Err(error) = window.maximize() {
+            log_desktop_event("window.state.restore_maximize_error", error.to_string());
+        }
+    }
+    log_desktop_event(
+        "window.state.restored",
+        format!(
+            "x={} y={} width={} height={} maximized={}",
+            state.x, state.y, width, height, state.maximized
+        ),
+    );
 }
 
 fn truncate_log(value: &str, limit: usize) -> String {
@@ -165,6 +266,7 @@ fn log_desktop_event(event: &str, detail: impl AsRef<str>) {
         return;
     }
     let (iso_timestamp, unix_millis) = utc_timestamp_parts();
+    let redacted_detail = redact_sensitive_text(detail.as_ref());
     let _guard = LOG_LOCK.get_or_init(|| Mutex::new(())).lock().ok();
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
@@ -177,7 +279,7 @@ fn log_desktop_event(event: &str, detail: impl AsRef<str>) {
             iso_timestamp,
             unix_millis,
             event,
-            detail.as_ref()
+            redacted_detail
         );
     }
 }
@@ -241,7 +343,7 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         } else {
             fs::write(
                 &root_env,
-                "HYPERSEARCH_ENV=production\nHYPERSEARCH_LAN_ENABLED=false\nHYPERSEARCH_PROVIDER_DEFAULT=lmstudio\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_LMSTUDIO_MODEL=qwen2.5-7b-instruct\nCOMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_IMAGE_SOURCE=online\n",
+                "HYPERSEARCH_ENV=production\nHYPERSEARCH_LAN_ENABLED=false\nHYPERSEARCH_LLM_ENABLED=true\nHYPERSEARCH_PROVIDER_DEFAULT=lmstudio\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_LMSTUDIO_MODEL=qwen2.5-7b-instruct\nCOMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_IMAGE_SOURCE=online\n",
             )
             .map_err(|error| error.to_string())?;
             log_desktop_event("runtime.env.create", "created .env from built-in defaults");
@@ -260,7 +362,7 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         }
         fs::write(
             &compose_env,
-            "COMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_BIND_HOST=127.0.0.1\nHYPERSEARCH_HTTP_PORT=8090\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:latest\n",
+            "COMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_BIND_HOST=127.0.0.1\nHYPERSEARCH_HTTP_PORT=8090\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_CADDY_IMAGE=caddy:2.11.2-alpine\nHYPERSEARCH_VALKEY_IMAGE=valkey/valkey:8.1.6-alpine\nHYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:2026.4.13-ee66b070a\n",
         )
         .map_err(|error| error.to_string())?;
         log_desktop_event(
@@ -273,6 +375,9 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
             format!("preserved {}", compose_env.display()),
         );
     }
+    set_env_value(&root_env, "HYPERSEARCH_ENV", "production")?;
+    set_env_minimum_int(&root_env, "HYPERSEARCH_PROVIDER_TIMEOUT_MS", 180000)?;
+    set_env_minimum_int(&root_env, "HYPERSEARCH_MAX_TIMEOUT_MS", 600000)?;
     set_env_value(&root_env, "COMPOSE_PROJECT_NAME", "hypersearch")?;
     set_env_default(
         &root_env,
@@ -294,6 +399,17 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         &compose_env,
         "HYPERSEARCH_UI_IMAGE",
         "ghcr.io/nacsez/hypersearch-ui:1.0.0",
+    )?;
+    set_env_value(&compose_env, "HYPERSEARCH_CADDY_IMAGE", "caddy:2.11.2-alpine")?;
+    set_env_value(
+        &compose_env,
+        "HYPERSEARCH_VALKEY_IMAGE",
+        "valkey/valkey:8.1.6-alpine",
+    )?;
+    set_env_value(
+        &compose_env,
+        "HYPERSEARCH_SEARXNG_IMAGE",
+        "searxng/searxng:2026.4.13-ee66b070a",
     )?;
     fs::create_dir_all(root.join("data").join("exports")).map_err(|error| error.to_string())?;
     Ok(())
@@ -416,11 +532,14 @@ fn write_command_log(
 ) -> Option<PathBuf> {
     let dir = command_logs_dir().ok()?;
     let (timestamp, millis) = utc_timestamp_parts();
+    let command_debug = redact_sensitive_text(command_debug);
+    let stdout = redact_sensitive_text(stdout);
+    let stderr = redact_sensitive_text(stderr);
     let filename = format!(
         "desktop-command-{}-{}-{}.log",
         timestamp.replace(':', "").replace('-', ""),
         millis,
-        safe_log_slug(command_debug)
+        safe_log_slug(&command_debug)
     );
     let path = dir.join(filename);
     let content = format!(
@@ -450,6 +569,8 @@ fn run_command(mut command: Command) -> Result<String, String> {
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_else(|| "<command log unavailable>".to_string());
     if !output.status.success() {
+        let redacted_stdout = redact_sensitive_text(&stdout);
+        let redacted_stderr = redact_sensitive_text(&stderr);
         log_desktop_event(
             "command.failure",
             format!(
@@ -458,12 +579,14 @@ fn run_command(mut command: Command) -> Result<String, String> {
                 output.status,
                 duration.as_millis(),
                 command_log,
-                truncate_log(&stdout, 1600),
-                truncate_log(&stderr, 1600)
+                truncate_log(&redacted_stdout, 1600),
+                truncate_log(&redacted_stderr, 1600)
             ),
         );
-        return Err(format!("{}\n{}", stdout, stderr).trim().to_string());
+        return Err(format!("{}\n{}", redacted_stdout, redacted_stderr).trim().to_string());
     }
+    let redacted_stdout = redact_sensitive_text(&stdout);
+    let redacted_stderr = redact_sensitive_text(&stderr);
     log_desktop_event(
         "command.success",
         format!(
@@ -472,11 +595,11 @@ fn run_command(mut command: Command) -> Result<String, String> {
             output.status,
             duration.as_millis(),
             command_log,
-            truncate_log(&stdout, 1200),
-            truncate_log(&stderr, 1200)
+            truncate_log(&redacted_stdout, 1200),
+            truncate_log(&redacted_stderr, 1200)
         ),
     );
-    Ok(format!("{}\n{}", stdout, stderr).trim().to_string())
+    Ok(format!("{}\n{}", redacted_stdout, redacted_stderr).trim().to_string())
 }
 
 fn run_docker(root: &Path, args: &[&str]) -> Result<String, String> {
@@ -665,6 +788,111 @@ fn docker_info_version(root: &Path) -> Result<String, String> {
     Ok(stdout)
 }
 
+fn doctor_command(program: &str, args: &[&str], docker_config: Option<&Path>) -> String {
+    let mut command = hidden_command(program);
+    command.args(args);
+    if let Some(config) = docker_config {
+        command.env("DOCKER_CONFIG", config);
+    }
+    match run_command(command) {
+        Ok(output) if output.trim().is_empty() => "ok".to_string(),
+        Ok(output) => truncate_log(&output, 1000),
+        Err(error) => format!("error: {}", truncate_log(&error, 1000)),
+    }
+}
+
+fn docker_doctor_report(root: &Path, last_error: &str) -> String {
+    let mut lines = Vec::new();
+    lines.push("Docker doctor findings:".to_string());
+    let local_config = match docker_config_dir(root) {
+        Ok(path) => {
+            let write_test = path.join("hypersearch-write-test.tmp");
+            match fs::write(&write_test, "ok").and_then(|_| fs::remove_file(&write_test)) {
+                Ok(_) => lines.push(format!(
+                    "local DOCKER_CONFIG: writable ({})",
+                    path.display()
+                )),
+                Err(error) => lines.push(format!(
+                    "local DOCKER_CONFIG: not writable ({}) - {}. Remediation: give your user write access to this folder or reinstall HyperSearch outside a protected directory.",
+                    path.display(),
+                    error
+                )),
+            }
+            path
+        }
+        Err(error) => {
+            lines.push(format!(
+                "local DOCKER_CONFIG: unavailable - {error}. Remediation: run HyperSearch from a user-writable directory."
+            ));
+            root.join(".docker")
+        }
+    };
+    if let Ok(profile) = env::var("USERPROFILE") {
+        let user_config = PathBuf::from(profile).join(".docker").join("config.json");
+        match fs::metadata(&user_config) {
+            Ok(_) => match fs::read_to_string(&user_config) {
+                Ok(_) => lines.push(format!(
+                    "user Docker config: readable ({})",
+                    user_config.display()
+                )),
+                Err(error) => lines.push(format!(
+                    "user Docker config: unreadable ({}) - {}. Remediation: repair that file's ACLs or keep using HyperSearch's isolated local .docker config.",
+                    user_config.display(),
+                    error
+                )),
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => lines.push(format!(
+                "user Docker config: access denied ({}) - {}. Remediation: repair that file's ACLs or keep using HyperSearch's isolated local .docker config.",
+                user_config.display(),
+                error
+            )),
+            Err(_) => lines.push(format!(
+                "user Docker config: not present ({})",
+                user_config.display()
+            )),
+        }
+    }
+    lines.push(format!(
+        "docker context: {}",
+        doctor_command("docker", &["context", "show"], Some(&local_config))
+    ));
+    #[cfg(windows)]
+    {
+        lines.push(format!(
+            "Docker Desktop service: {}",
+            doctor_command("sc.exe", &["query", "com.docker.service"], None)
+        ));
+        lines.push(format!(
+            "docker-users membership: {}",
+            if doctor_command("whoami", &["/groups"], None)
+                .to_ascii_lowercase()
+                .contains("docker-users")
+            {
+                "current user appears to be in docker-users"
+            } else {
+                "current user was not reported in docker-users. Remediation: add this Windows account to the docker-users group, sign out, then sign back in."
+            }
+        ));
+        match fs::metadata(r"\\.\pipe\docker_engine") {
+            Ok(_) => lines.push("Docker named pipe: visible".to_string()),
+            Err(error) => lines.push(format!(
+                "Docker named pipe: not accessible - {}. Remediation: start Docker Desktop, confirm it finished initialization, and verify this user can access the Docker engine pipe.",
+                error
+            )),
+        }
+    }
+    if last_error.to_ascii_lowercase().contains("npipe") {
+        lines.push("classification: named-pipe or Docker engine permission failure".to_string());
+    } else if last_error.to_ascii_lowercase().contains("access is denied") {
+        lines.push("classification: Docker config or engine access denied".to_string());
+    } else if last_error.to_ascii_lowercase().contains("daemon") {
+        lines.push("classification: Docker daemon is not ready".to_string());
+    } else {
+        lines.push("classification: Docker readiness failure".to_string());
+    }
+    lines.join("\n")
+}
+
 fn ensure_docker_ready() -> Result<String, String> {
     log_desktop_event(
         "docker.ready_check.start",
@@ -707,9 +935,12 @@ fn ensure_docker_ready() -> Result<String, String> {
         "docker.ready_check.timeout",
         truncate_log(&last_error, 1600),
     );
+    let doctor = docker_doctor_report(&root, &last_error);
+    log_desktop_event("docker.ready_check.doctor", &doctor);
     Err(format!(
-        "Docker Desktop did not become ready within 90 seconds. Open Docker Desktop and wait for the engine to finish starting, then press Start again.\n\nLast Docker error:\n{}",
-        last_error
+        "Docker Desktop did not become ready within 90 seconds. Open Docker Desktop and wait for the engine to finish starting, then press Start again.\n\nLast Docker error:\n{}\n\n{}",
+        last_error,
+        doctor
     ))
 }
 
@@ -750,6 +981,18 @@ fn set_env_default(path: &Path, name: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn set_env_minimum_int(path: &Path, name: &str, minimum: i64) -> Result<(), String> {
+    let current = read_env_value(path, name, "");
+    let should_update = current
+        .parse::<i64>()
+        .map(|value| value < minimum)
+        .unwrap_or(true);
+    if should_update {
+        set_env_value(path, name, &minimum.to_string())?;
+    }
+    Ok(())
+}
+
 fn paired_app_url() -> Result<String, String> {
     let root = repo_root()?;
     let compose_env = root.join("infra").join("docker").join(".env");
@@ -764,7 +1007,7 @@ fn paired_app_url() -> Result<String, String> {
     let lan_enabled = read_env_value(&root_env, "HYPERSEARCH_LAN_ENABLED", "false") == "true";
     let token = read_env_value(&root_env, "HYPERSEARCH_PAIRING_TOKEN", "");
     if lan_enabled && !token.is_empty() {
-        Ok(format!("{base_url}?hypersearch_token={token}"))
+        Ok(format!("{base_url}#hypersearch_token={token}"))
     } else {
         Ok(base_url)
     }
@@ -808,23 +1051,100 @@ fn sanitize_export_filename(value: &str) -> String {
     }
 }
 
-fn redact_env_contents(value: &str) -> String {
+fn is_sensitive_key(value: &str) -> bool {
+    let normalized = value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .replace('-', "_")
+        .to_ascii_uppercase();
+    normalized.contains("TOKEN")
+        || normalized.contains("SECRET")
+        || normalized.contains("PASSWORD")
+        || normalized.contains("PASSWD")
+        || normalized.contains("API_KEY")
+        || normalized.contains("ACCESS_KEY")
+        || normalized.contains("PRIVATE_KEY")
+        || normalized.contains("AUTH")
+        || normalized.contains("CREDENTIAL")
+}
+
+fn redact_key_value_line(line: &str) -> Option<String> {
+    let separator = line.find('=').or_else(|| line.find(':'))?;
+    let (left, right) = line.split_at(separator);
+    let key = left
+        .rsplit([' ', '{', ',', '['])
+        .next()
+        .unwrap_or(left)
+        .trim();
+    if !is_sensitive_key(key) {
+        return None;
+    }
+    let separator_char = right.chars().next().unwrap_or('=');
+    let suffix = if line.trim_end().ends_with(',') { "," } else { "" };
+    Some(format!("{left}{separator_char}<redacted>{suffix}"))
+}
+
+fn redact_parameter_value(line: &str, marker: &str) -> String {
+    let mut output = String::with_capacity(line.len());
+    let mut remaining = line;
+    while let Some(index) = remaining.to_ascii_lowercase().find(marker) {
+        let (before, after_before) = remaining.split_at(index);
+        output.push_str(before);
+        output.push_str(marker);
+        output.push_str("<redacted>");
+        let after_marker = &after_before[marker.len()..];
+        let keep_from = after_marker
+            .find(['&', ' ', '\t', '\r', '\n', '"', '\''])
+            .unwrap_or(after_marker.len());
+        remaining = &after_marker[keep_from..];
+    }
+    output.push_str(remaining);
+    output
+}
+
+fn redact_bearer_tokens(line: &str) -> String {
+    let lower = line.to_ascii_lowercase();
+    let Some(index) = lower.find("bearer ") else {
+        return line.to_string();
+    };
+    let mut output = String::from(&line[..index + 7]);
+    output.push_str("<redacted>");
+    let rest = &line[index + 7..];
+    let keep_from = rest
+        .find([' ', '\t', '\r', '\n', '"', '\''])
+        .unwrap_or(rest.len());
+    output.push_str(&rest[keep_from..]);
+    output
+}
+
+fn redact_sensitive_line(line: &str) -> String {
+    if let Some(redacted) = redact_key_value_line(line) {
+        return redacted;
+    }
+    let mut redacted = line.to_string();
+    for marker in [
+        "hypersearch_token=",
+        "pairing_token=",
+        "access_token=",
+        "refresh_token=",
+        "api_key=",
+    ] {
+        redacted = redact_parameter_value(&redacted, marker);
+    }
+    redact_bearer_tokens(&redacted)
+}
+
+fn redact_sensitive_text(value: &str) -> String {
     value
         .lines()
-        .map(|line| {
-            if let Some((name, _)) = line.split_once('=') {
-                if name.to_ascii_uppercase().contains("TOKEN")
-                    || name.to_ascii_uppercase().contains("SECRET")
-                    || name.to_ascii_uppercase().contains("PASSWORD")
-                    || name.to_ascii_uppercase().contains("KEY")
-                {
-                    return format!("{name}=<redacted>");
-                }
-            }
-            line.to_string()
-        })
+        .map(redact_sensitive_line)
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn redact_env_contents(value: &str) -> String {
+    redact_sensitive_text(value)
 }
 
 fn copy_diagnostics_tree(source: &Path, target: &Path) -> Result<(), String> {
@@ -839,7 +1159,23 @@ fn copy_diagnostics_tree(source: &Path, target: &Path) -> Result<(), String> {
         if source_path.is_dir() {
             copy_diagnostics_tree(&source_path, &target_path)?;
         } else if source_path.is_file() {
-            fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
+            let extension = source_path
+                .extension()
+                .and_then(OsStr::to_str)
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if matches!(extension.as_str(), "log" | "txt" | "json" | "env" | "yaml" | "yml") {
+                match fs::read_to_string(&source_path) {
+                    Ok(contents) => fs::write(&target_path, redact_sensitive_text(&contents))
+                        .map_err(|error| error.to_string())?,
+                    Err(_) => {
+                        fs::copy(&source_path, &target_path)
+                            .map_err(|error| error.to_string())?;
+                    }
+                }
+            } else {
+                fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
+            }
         }
     }
     Ok(())
@@ -850,7 +1186,7 @@ fn write_diagnostics_command(target: &Path, filename: &str, output: Result<Strin
         Ok(text) => format!("status=success\n\n{text}\n"),
         Err(error) => format!("status=error\n\n{error}\n"),
     };
-    let _ = fs::write(target.join(filename), body);
+    let _ = fs::write(target.join(filename), redact_sensitive_text(&body));
 }
 
 fn export_diagnostics_sync() -> Result<String, String> {
@@ -899,7 +1235,7 @@ fn export_diagnostics_sync() -> Result<String, String> {
     copy_diagnostics_tree(&logs_dir, &target.join("logs"))?;
     fs::write(
         target.join("README.txt"),
-        "HyperSearch diagnostics bundle. Token, key, password, and secret values are redacted from env files.\n",
+        "HyperSearch diagnostics bundle. Token, key, password, auth, and credential values are redacted from env files, compose output, copied command logs, and desktop logs.\n",
     )
     .map_err(|error| error.to_string())?;
     log_desktop_event(
@@ -1027,20 +1363,160 @@ fn backend_logs_sync() -> Result<String, String> {
     result
 }
 
+#[derive(Debug)]
+struct ComposeServiceState {
+    service: String,
+    state: String,
+    health: String,
+}
+
+fn json_field(value: &serde_json::Value, keys: &[&str]) -> String {
+    for key in keys {
+        if let Some(text) = value.get(*key).and_then(serde_json::Value::as_str) {
+            return text.to_string();
+        }
+    }
+    String::new()
+}
+
+fn parse_compose_ps_json(output: &str) -> Result<Vec<ComposeServiceState>, String> {
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+    let values = if trimmed.starts_with('[') {
+        match serde_json::from_str::<serde_json::Value>(trimmed)
+            .map_err(|error| format!("Unable to parse docker compose ps JSON: {error}"))?
+        {
+            serde_json::Value::Array(items) => items,
+            value => vec![value],
+        }
+    } else {
+        let mut items = Vec::new();
+        for line in trimmed.lines().filter(|line| !line.trim().is_empty()) {
+            items.push(
+                serde_json::from_str::<serde_json::Value>(line)
+                    .map_err(|error| format!("Unable to parse docker compose ps JSON line: {error}; line={line}"))?,
+            );
+        }
+        items
+    };
+    Ok(values
+        .iter()
+        .map(|value| ComposeServiceState {
+            service: json_field(value, &["Service", "service", "Name", "name"]),
+            state: json_field(value, &["State", "state"]),
+            health: json_field(value, &["Health", "health"]),
+        })
+        .collect())
+}
+
+fn compose_services_report(services: &[ComposeServiceState]) -> (bool, String) {
+    let required = ["api", "ui", "caddy", "searxng", "valkey"];
+    let mut ok = true;
+    let mut lines = Vec::new();
+    for service_name in required {
+        let Some(service) = services.iter().find(|item| item.service == service_name || item.service.ends_with(&format!("-{service_name}-1"))) else {
+            ok = false;
+            lines.push(format!("{service_name}: missing"));
+            continue;
+        };
+        let state_ok = service.state.to_ascii_lowercase().contains("running");
+        let health_ok = service.health.trim().is_empty()
+            || service.health.eq_ignore_ascii_case("healthy")
+            || service.health.eq_ignore_ascii_case("none");
+        if !state_ok || !health_ok {
+            ok = false;
+        }
+        lines.push(format!(
+            "{}: state={} health={}",
+            service_name,
+            if service.state.is_empty() { "unknown" } else { &service.state },
+            if service.health.is_empty() { "not-declared" } else { &service.health }
+        ));
+    }
+    (ok, lines.join("\n"))
+}
+
+fn http_probe(base_url: &str, path: &str) -> Result<String, String> {
+    let parsed = Url::parse(base_url).map_err(|error| error.to_string())?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "App URL has no host".to_string())?;
+    let port = parsed
+        .port_or_known_default()
+        .ok_or_else(|| "App URL has no port".to_string())?;
+    let address = (host, port)
+        .to_socket_addrs()
+        .map_err(|error| error.to_string())?
+        .next()
+        .ok_or_else(|| "App URL host did not resolve".to_string())?;
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))
+        .map_err(|error| error.to_string())?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(4)))
+        .map_err(|error| error.to_string())?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| error.to_string())?;
+    let host_header = if parsed.port().is_some() {
+        format!("{host}:{port}")
+    } else {
+        host.to_string()
+    };
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: {host_header}\r\nConnection: close\r\nUser-Agent: HyperSearchDesktop/1.0\r\n\r\n"
+    );
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|error| error.to_string())?;
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| error.to_string())?;
+    let status_line = response.lines().next().unwrap_or_default().to_string();
+    if status_line.contains(" 200 ") {
+        Ok(status_line)
+    } else {
+        Err(if status_line.is_empty() {
+            "No HTTP response".to_string()
+        } else {
+            status_line
+        })
+    }
+}
+
 fn backend_status_sync() -> Result<BackendStatus, String> {
     log_desktop_event("backend.status.start", "docker compose ps requested");
     let root = repo_root()?;
     let root_env = root.join(".env");
     let lan_enabled = read_env_value(&root_env, "HYPERSEARCH_LAN_ENABLED", "false") == "true";
-    let status = run_compose(&["ps"]);
+    let app_url = paired_app_url()?;
+    let status = run_compose(&["ps", "--format", "json"]);
+    let (services_ok, service_detail) = match &status {
+        Ok(output) => match parse_compose_ps_json(output) {
+            Ok(services) => compose_services_report(&services),
+            Err(error) => (false, error),
+        },
+        Err(error) => (false, error.clone()),
+    };
+    let live_probe = http_probe(&app_url, "/v1/live");
+    let ready_probe = http_probe(&app_url, "/v1/ready");
+    let http_ok = live_probe.is_ok();
+    let search_ready = ready_probe.is_ok();
+    let detail = format!(
+        "compose_services_ok={services_ok}\n{service_detail}\n\nhttp_live={}\nhttp_ready={}",
+        live_probe.unwrap_or_else(|error| format!("error: {error}")),
+        ready_probe.unwrap_or_else(|error| format!("error: {error}"))
+    );
     let backend_status = BackendStatus {
-        ok: status
-            .as_ref()
-            .map(|text| text.contains("running") || text.contains("Up") || text.contains("healthy"))
-            .unwrap_or(false),
-        detail: status.unwrap_or_else(|error| error),
-        app_url: paired_app_url()?,
+        ok: services_ok && http_ok && search_ready,
+        detail,
+        app_url,
         lan_enabled,
+        services_ok,
+        http_ok,
+        search_ready,
     };
     log_desktop_event(
         "backend.status.complete",
@@ -1267,7 +1743,7 @@ fn open_console_window(app: AppHandle) -> Result<String, String> {
     )
     .title("HyperSearch Session")
     .inner_size(1280.0, 860.0)
-    .min_inner_size(920.0, 620.0)
+    .min_inner_size(1100.0, 720.0)
     .build()
     .map_err(|error| error.to_string())?;
     log_desktop_event(
@@ -1287,6 +1763,9 @@ fn main() {
                 eprintln!("HyperSearch runtime setup failed: {error}");
             } else {
                 log_desktop_event("app.setup.complete", "runtime stack prepared");
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                restore_main_window_state(&window);
             }
             Ok(())
         })
@@ -1309,6 +1788,7 @@ fn main() {
                 return;
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
+                save_main_window_state(window);
                 api.prevent_close();
                 if CLOSE_CONFIRM_ACTIVE.swap(true, Ordering::SeqCst) {
                     log_desktop_event(
@@ -1336,4 +1816,29 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running HyperSearch desktop app");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_sensitive_text;
+
+    #[test]
+    fn redacts_secret_bearing_lines_and_url_tokens() {
+        let input = [
+            "HYPERSEARCH_PAIRING_TOKEN=abc123",
+            "normal=value",
+            "url=http://127.0.0.1:8090/#hypersearch_token=secret-token&x=1",
+            "Authorization: Bearer secret-bearer",
+            "\"api_key\":\"secret-key\",",
+        ]
+        .join("\n");
+
+        let redacted = redact_sensitive_text(&input);
+
+        assert!(!redacted.contains("abc123"));
+        assert!(!redacted.contains("secret-token"));
+        assert!(!redacted.contains("secret-bearer"));
+        assert!(!redacted.contains("secret-key"));
+        assert!(redacted.contains("normal=value"));
+    }
 }

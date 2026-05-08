@@ -18,6 +18,7 @@ class NormalizedQuery:
     page: int
     results_per_page: int
     max_pages: int
+    target_result_count: int | None
     safe_search: int
     timeout_ms: int | None
     cache_policy: str
@@ -32,6 +33,7 @@ class NormalizedQuery:
             "page": self.page,
             "results_per_page": self.results_per_page,
             "max_pages": self.max_pages,
+            "target_result_count": self.target_result_count,
             "safe_search": self.safe_search,
         }
         data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -49,6 +51,7 @@ class QueryNormalizer:
             page=request.page,
             results_per_page=request.results_per_page,
             max_pages=request.max_pages,
+            target_result_count=request.target_result_count,
             safe_search=request.safe_search,
             timeout_ms=request.timeout_ms,
             cache_policy=request.cache_policy,
@@ -64,6 +67,7 @@ class QueryNormalizer:
             page=request.page,
             results_per_page=request.results_per_page,
             max_pages=request.max_pages,
+            target_result_count=request.target_result_count,
             safe_search=1,
             timeout_ms=request.timeout_ms,
             cache_policy=request.cache_policy,
@@ -82,4 +86,3 @@ class QueryNormalizer:
             seen.add(clean)
             result.append(clean)
         return result
-

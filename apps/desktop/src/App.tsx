@@ -14,6 +14,9 @@ interface BackendStatus {
   detail: string;
   app_url: string;
   lan_enabled: boolean;
+  services_ok?: boolean;
+  http_ok?: boolean;
+  search_ready?: boolean;
 }
 
 interface ExportSettings {
@@ -44,7 +47,7 @@ function asMessage(error: unknown) {
 }
 
 function displayUrl(value: string) {
-  return value.split("?")[0];
+  return value.split("?")[0].split("#")[0];
 }
 
 function sessionUrl(baseUrl: string, session: Pick<SessionTab, "id" | "title">) {
@@ -117,6 +120,16 @@ export function App() {
     }
   };
 
+  const waitForReady = async () => {
+    let nextStatus = await refresh();
+    for (let attempt = 0; attempt < 20 && !nextStatus?.ok; attempt += 1) {
+      recordAction(`Waiting for API, UI, SearXNG, and cache readiness (${attempt + 1}/20)...`);
+      await new Promise((resolve) => window.setTimeout(resolve, 3000));
+      nextStatus = await refresh();
+    }
+    return nextStatus;
+  };
+
   const recordAction = (text: string) => {
     setMessage(text);
     setActionHistory((current) => [
@@ -135,7 +148,7 @@ export function App() {
     try {
       const output = await invoke<string>("backend_action", { action });
       recordAction(output || `${action} completed.`);
-      const nextStatus = await refresh();
+      const nextStatus = action === "down" ? await refresh() : await waitForReady();
       if (action === "down") {
         setSessions([]);
         setActiveSessionId(null);
@@ -338,6 +351,21 @@ export function App() {
     document.documentElement.style.setProperty("--desktop-ui-scale", String(clamped));
     window.localStorage.setItem(DESKTOP_ZOOM_KEY, String(clamped));
   }, [desktopZoom]);
+
+  useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      setDesktopZoom((current) => {
+        const delta = event.deltaY < 0 ? 0.05 : -0.05;
+        return Math.min(2, Math.max(0.5, Number((current + delta).toFixed(2))));
+      });
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
@@ -609,7 +637,13 @@ function DeployView({
             label="Backend Stack"
             value={status?.ok ? "Running" : "Stopped"}
             tone={status?.ok ? "ok" : "warn"}
-            detail={status?.ok ? `Console: ${safeAppUrl}` : "Press Start to launch API, UI, Caddy, Valkey, and SearXNG."}
+            detail={status?.ok ? `Console: ${safeAppUrl}` : status?.detail ? status.detail.slice(0, 260) : "Press Start to launch API, UI, Caddy, Valkey, and SearXNG."}
+          />
+          <StatusCard
+            label="Search Readiness"
+            value={status?.search_ready ? "Ready" : "Waiting"}
+            tone={status?.search_ready ? "ok" : "warn"}
+            detail={status?.services_ok ? "Services are running; HTTP readiness determines when sessions can open." : "API, UI, Caddy, Valkey, and SearXNG must all be running before sessions open."}
           />
           <StatusCard
             label="LAN Access"

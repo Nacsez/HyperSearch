@@ -6,10 +6,12 @@ This guide is the durable reference for building and testing the private HyperSe
 
 HyperSearch now has two installer media channels:
 
-- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop and LM Studio setup, and pulls prebuilt Docker images during setup. During private beta, if the registry rejects the pull, setup falls back to building the HyperSearch API/UI images locally from the installed source payload and records that choice in the setup summary.
-- **Full media**: beta-testing package. It includes the installer plus `payload\images` Docker image archives so setup can run `docker load` instead of depending on Docker Hub or GHCR during first launch.
+- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop setup, optionally guides LM Studio setup, and pulls pinned prebuilt Docker images during setup. During private beta, if the registry rejects the pull, setup falls back to building the HyperSearch API/UI images locally from the installed source payload and records that choice in the setup summary.
+- **Full media**: beta-testing package. It includes the installer plus `payload\images` Docker image archives and digest manifests so setup can run `docker load` instead of depending on Docker Hub or GHCR during first launch.
 
 The private beta should use full media whenever possible. The online installer is still useful for connected developer systems and later public release testing.
+
+For GitHub distribution, do not commit generated binaries or image archives. Zip the generated `Online` and `Full` media folders and upload those zip files as release assets. See `docs/beta_github_distribution_2026-05-08.md` for the current private beta asset names, checksums, and release description template.
 
 ## Repository And Registries
 
@@ -63,7 +65,7 @@ Only bundle third-party installers after confirming their redistribution terms. 
 Release startup uses:
 
 ```text
-docker compose --project-name hypersearch up -d
+.\scripts\Deploy-HyperSearch.cmd -Action up
 ```
 
 If the release startup path fails with a registry authorization error, the desktop app runs:
@@ -80,7 +82,7 @@ Developer builds use:
 docker compose --project-name hypersearch -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-The desktop launcher and helper scripts use the fixed project name `hypersearch`, so containers and networks are easier to identify and less likely to collide with unrelated Compose projects.
+The desktop launcher and helper scripts use the fixed project name `hypersearch`, so containers and networks are easier to identify and less likely to collide with unrelated Compose projects. Before opening sessions, the launcher requires structured Compose status for API, UI/Caddy, SearXNG, and Valkey plus HTTP probes for `/v1/live` and search readiness.
 
 ## Installer Diagnostics
 
@@ -97,7 +99,7 @@ The desktop launcher writes:
 - `%LOCALAPPDATA%\HyperSearch\logs\commands\*.log`
 - `%LOCALAPPDATA%\HyperSearch\diagnostics\hypersearch-diagnostics-*`
 
-Use **Settings > Export Diagnostics** in the desktop launcher before collecting manual issue notes.
+Use **Settings > Export Diagnostics** in the desktop launcher before collecting manual issue notes. The bundle redacts token, key, password, auth, and credential values across env files, compose output, command logs, and desktop logs.
 
 ## Beta Acceptance Criteria
 
@@ -105,6 +107,8 @@ Use **Settings > Export Diagnostics** in the desktop launcher before collecting 
 - Docker images load from bundled archives without registry access.
 - HyperSearch starts from bundled images on full media, or clearly reports and logs the local-build fallback when online private-registry access is unavailable.
 - Search works without LM Studio.
-- Research mode clearly reports local-model readiness and succeeds when LM Studio has a loaded matching model.
+- Research fallback works without LM Studio and returns `trace.mode="search-only-fallback"`.
+- Research synthesis clearly reports local-model readiness and succeeds when LM Studio has a loaded matching model.
+- Diagnostics export does not contain sentinel token/key/password/auth values.
 - Installer result screen and diagnostic logs explain any incomplete prerequisite.
 - Reinstall preserves local data, exports, settings, logs, and history.

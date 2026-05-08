@@ -207,6 +207,73 @@ export function MarkdownAnswer({ value }: { value: unknown }) {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function firstNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    const parsed = asNumber(value);
+    if (parsed !== null) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function displayMetricValue(value: unknown) {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  return "n/a";
+}
+
+function providerReadinessSummary(value: unknown): string | null {
+  const readiness = asRecord(value);
+  if (!Object.keys(readiness).length) {
+    return null;
+  }
+  const model = readiness.model ?? readiness.preferred_model ?? readiness.selected_model;
+  const provider = readiness.provider ?? readiness.name;
+  const ready = readiness.ready ?? readiness.ok ?? readiness.generation_ok;
+  const detail = readiness.detail ?? readiness.message ?? readiness.error;
+  const state = typeof ready === "boolean" ? (ready ? "Ready" : "Not ready") : "Checked";
+  return [state, provider, model, detail].filter((item) => typeof item === "string" && item.trim()).join(" · ");
+}
+
+function researchStepsSummary(value: unknown): string | null {
+  const steps = asRecord(value);
+  if (!Object.keys(steps).length) {
+    return null;
+  }
+  const summaryMeta = asRecord(steps.summary_meta);
+  const failedBatches = Array.isArray(summaryMeta.failed_batches) ? summaryMeta.failed_batches.length : 0;
+  const fragments = [
+    firstNumber(steps.source_count) !== null ? `${firstNumber(steps.source_count)} sources` : null,
+    firstNumber(steps.synopsis_count) !== null ? `${firstNumber(steps.synopsis_count)} synopsis batch${firstNumber(steps.synopsis_count) === 1 ? "" : "es"}` : null,
+    summaryMeta.compact_mode === true ? "compact mode" : null,
+    failedBatches ? `${failedBatches} fallback batch${failedBatches === 1 ? "" : "es"}` : null
+  ].filter(Boolean);
+  return fragments.length ? fragments.join(" · ") : null;
+}
+
 export function ResearchPane({ payload, searchSummary }: ResearchPaneProps) {
   if (!payload) {
     if (searchSummary) {
@@ -223,8 +290,46 @@ export function ResearchPane({ payload, searchSummary }: ResearchPaneProps) {
   }
 
   const citations = Array.isArray(payload.citations) ? payload.citations : [];
-  const traceEntries = Object.entries(payload.trace ?? {}).filter(([, value]) => value !== null && value !== "");
+  const trace = asRecord(payload.trace);
+  const rawSearch = payload.raw_search ?? null;
   const requestId = payload.request_id || "n/a";
+  const searchSourcesRequested = firstNumber(
+    trace.search_target_result_count,
+    rawSearch?.debug?.target_result_count,
+    rawSearch?.result_count
+  );
+  const searchSourcesRetrieved = firstNumber(
+    trace.search_result_count,
+    rawSearch?.result_count,
+    rawSearch?.results?.length
+  );
+  const researchSourcesRequested = firstNumber(
+    trace.requested_source_count,
+    trace.research_source_target_count,
+    citations.length
+  );
+  const researchSourcesRetrieved = firstNumber(
+    trace.research_sources_retrieved,
+    trace.document_count,
+    citations.length
+  );
+  const providerError = typeof trace.provider_error === "string" && trace.provider_error.trim() ? trace.provider_error : null;
+  const providerStatus = providerReadinessSummary(trace.provider_readiness);
+  const stepsSummary = researchStepsSummary(trace.research_steps);
+  const metricItems = [
+    { label: "Request", value: requestId.slice(0, 8) },
+    { label: "Mode", value: trace.mode },
+    { label: "Provider", value: trace.provider },
+    { label: "Model", value: trace.model },
+    { label: "Search Sources Requested", value: searchSourcesRequested },
+    { label: "Search Sources Retrieved", value: searchSourcesRetrieved },
+    { label: "Research Sources Requested", value: researchSourcesRequested },
+    { label: "Research Sources Retrieved", value: researchSourcesRetrieved },
+    { label: "Research Source Shortfall", value: trace.source_shortfall },
+    { label: "Provider Status", value: providerStatus },
+    { label: "Research Steps", value: stepsSummary },
+    { label: "Provider Error", value: providerError }
+  ].filter((item) => item.value !== null && item.value !== undefined && item.value !== "");
 
   return (
     <div className="research-pane">
@@ -250,18 +355,10 @@ export function ResearchPane({ payload, searchSummary }: ResearchPaneProps) {
         ))}
       </div>
       <div className="trace-grid">
-        <div className="trace-item">
-          <span>Request</span>
-          <strong>{requestId.slice(0, 8)}</strong>
-        </div>
-        <div className="trace-item">
-          <span>Citations</span>
-          <strong>{citations.length}</strong>
-        </div>
-        {traceEntries.map(([key, value]) => (
-          <div key={key} className="trace-item">
-            <span>{key.replace(/_/g, " ")}</span>
-            <strong>{String(value)}</strong>
+        {metricItems.map((item) => (
+          <div key={item.label} className="trace-item">
+            <span>{item.label}</span>
+            <strong>{displayMetricValue(item.value)}</strong>
           </div>
         ))}
       </div>

@@ -16,18 +16,19 @@ class ResearchRequest(BaseModel):
     page: int = Field(default=1, ge=1, le=20)
     results_per_page: int = Field(default=10, ge=1, le=50)
     max_pages: int = Field(default=1, ge=1, le=5)
+    target_result_count: int | None = Field(default=None, ge=1, le=250)
     safe_search: int = Field(default=1, ge=0, le=2)
     top_n: int = Field(default=5, ge=1, le=250)
-    timeout_ms: int | None = Field(default=None, ge=1000, le=120000)
+    timeout_ms: int | None = Field(default=None, ge=1000, le=600000)
     cache_policy: CachePolicy = "use"
     provider: str | None = None
     streaming: bool = False
     include_debug_trace: bool = True
 
-    @field_validator("page", "results_per_page", "max_pages", "top_n")
+    @field_validator("page", "results_per_page", "max_pages", "target_result_count", "top_n")
     @classmethod
-    def validate_positive(cls, value: int) -> int:
-        if value < 1:
+    def validate_positive(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
             raise ValueError("must be >= 1")
         return value
 

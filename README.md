@@ -16,7 +16,8 @@ HyperSearch is a local-control search and research service for people who want t
 ## 1.0 Local-Control Position
 
 - No external/cloud model API keys are supported for 1.0.
-- Research synthesis requires a local OpenAI-compatible provider such as LM Studio, local vLLM, or local llama.cpp.
+- Search-only is a supported installation mode. Research synthesis uses a local OpenAI-compatible provider such as LM Studio, local vLLM, or local llama.cpp when one is enabled and ready.
+- The app-level LLM toggle is stored locally. `HYPERSEARCH_LLM_ENABLED=false` or `HYPERSEARCH_RESEARCH_CAPABILITY=search-only` starts HyperSearch in search-only mode.
 - Browser/API access binds to localhost by default.
 - LAN access is opt-in and protected by a pairing token managed by the desktop launcher.
 - Docker remains the backend runtime for 1.0, but the desktop launcher is the preferred user entrypoint.
@@ -72,13 +73,14 @@ docker compose --project-name hypersearch -f docker-compose.yml -f docker-compos
 ### Windows Deploy Helper
 
 ```powershell
-.\scripts\Deploy-HyperSearch.ps1
-.\scripts\Deploy-HyperSearch.ps1 -Action status
-.\scripts\Deploy-HyperSearch.ps1 -Action logs -Follow
-.\scripts\Deploy-HyperSearch.ps1 -Action down
+.\scripts\Deploy-HyperSearch.cmd
+.\scripts\Deploy-HyperSearch.cmd -Action status
+.\scripts\Deploy-HyperSearch.cmd -Action logs -Follow
+.\scripts\Deploy-HyperSearch.cmd -Action doctor
+.\scripts\Deploy-HyperSearch.cmd -Action down
 ```
 
-The deploy helper wraps the Docker Compose stack in `infra/docker` and defaults to release-mode `up -d`. Use `-Build` only when you intentionally want the local development override.
+The deploy helper wraps the Docker Compose stack in `infra/docker`, uses an isolated repo-local Docker config, and defaults to release-mode `up -d`. Use `-Build` only when you intentionally want the local development override. The `doctor` action reports Docker config ACLs, context, named-pipe access, Docker Desktop service state, and `docker-users` group membership.
 
 ### Release Candidate Media
 
@@ -90,9 +92,11 @@ The deploy helper wraps the Docker Compose stack in `infra/docker` and defaults 
 The generated media supports:
 
 - online installer media that pulls prebuilt images
-- full installer media that loads bundled Docker image archives
+- full installer media that loads bundled Docker image archives and carries image digest manifests
 - installer and desktop command logs under `%LOCALAPPDATA%\HyperSearch\logs`
-- diagnostics export under `%LOCALAPPDATA%\HyperSearch\diagnostics`
+- diagnostics export under `%LOCALAPPDATA%\HyperSearch\diagnostics` with token/key/password/auth values redacted
+
+For GitHub distribution, upload the generated media folders or zip archives as release assets rather than committing installer binaries to the repository. Use online media for small connected installs and full media for beta testers who should not depend on registry access during first launch. The current asset handoff workflow is documented in `docs/beta_github_distribution_2026-05-08.md`.
 
 ## In-App Help
 
@@ -112,6 +116,7 @@ The generated media supports:
 - Start the LM Studio local server on port `1234`.
 - Load a model and make sure the model identifier matches `HYPERSEARCH_LMSTUDIO_MODEL` in the repo-root `.env`.
 - For Docker, the API reaches LM Studio through `http://host.docker.internal:1234`.
+- If LM Studio is not installed or no model is loaded, search and source review still work. The UI reports "Search ready / LLM off" or "Search ready / LLM unavailable" instead of treating the installation as failed.
 
 ## Notable Design Choices
 
@@ -119,6 +124,7 @@ The generated media supports:
 - Search, fetched pages, extracts, and research synthesis use separate cache namespaces and TTLs.
 - Default network bind is localhost. Non-local browser/API access is disabled unless LAN mode and a pairing token are enabled.
 - Provider profiles store local endpoints and preferred model names, not cloud API secrets.
+- `/v1/ready` reports search readiness independently from LLM readiness. Search can be ready while LLM is disabled or unavailable.
 - Optional dependencies degrade gracefully:
   - no Valkey client -> in-memory cache
   - no Trafilatura -> basic HTML text stripping

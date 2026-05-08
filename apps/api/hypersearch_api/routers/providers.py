@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from hypersearch_api.auth import require_access
 from hypersearch_api.schemas.provider import (
     DefaultProviderRequest,
+    ProviderDraftSettings,
     ProviderInfo,
     ProviderModelsResponse,
     ProviderProfileUpdate,
@@ -22,8 +23,23 @@ async def list_providers(request: Request):
 
 @router.post("/test", response_model=ProviderTestResponse, dependencies=[Depends(require_access)])
 async def test_provider(body: ProviderTestRequest, request: Request):
-    ok, detail = await request.app.state.provider_service.test_provider(body.name)
-    return ProviderTestResponse(ok=ok, detail=detail)
+    payload = await request.app.state.provider_service.test_provider(
+        name=body.name,
+        base_url=body.base_url,
+        model=body.model,
+        enabled=body.enabled,
+    )
+    return ProviderTestResponse(**payload)
+
+
+@router.post("/models", response_model=ProviderModelsResponse, dependencies=[Depends(require_access)])
+async def list_draft_provider_models(body: ProviderTestRequest, request: Request):
+    return await request.app.state.provider_service.list_draft_provider_models(
+        name=body.name,
+        base_url=body.base_url,
+        model=body.model,
+        enabled=True if body.enabled is None else body.enabled,
+    )
 
 
 @router.get("/{name}/models", response_model=ProviderModelsResponse, dependencies=[Depends(require_access)])
@@ -51,5 +67,16 @@ async def update_provider(name: str, body: ProviderProfileUpdate, request: Reque
 
 
 @router.post("/{name}/verify-model", dependencies=[Depends(require_access)])
-async def verify_provider_model(name: str, request: Request):
-    return await request.app.state.provider_service.ensure_model_available(name)
+async def verify_provider_model(
+    name: str,
+    request: Request,
+    body: ProviderDraftSettings | None = None,
+):
+    if body is None:
+        return await request.app.state.provider_service.verify_model_available(name)
+    return await request.app.state.provider_service.verify_model_available(
+        name=name,
+        base_url=body.base_url,
+        model=body.model,
+        enabled=body.enabled,
+    )

@@ -574,7 +574,6 @@ h1 {
 .result-card__meta,
 .provider-card,
 .provider-card__actions,
-.citation-card,
 .workspace-summary {
   display: flex;
   flex-wrap: wrap;
@@ -648,6 +647,33 @@ h1 {
 .result-card,
 .citation-card {
   scroll-margin-top: 22px;
+}
+
+.citation-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px 12px;
+  overflow: hidden;
+}
+
+.citation-card > div {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 6px;
+}
+
+.citation-card strong,
+.citation-card a,
+.citation-card p,
+.result-card h3,
+.result-card a,
+.result-card p {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-body {
@@ -793,6 +819,13 @@ h1 {
   color: var(--muted);
 }
 
+.result-card__meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .result-summary__primary,
 .workspace-summary__chips,
 .provider-card__headline {
@@ -827,6 +860,7 @@ h1 {
 
 .result-badge,
 .summary-chip {
+  min-width: 0;
   max-width: 100%;
   display: inline-flex;
   align-items: center;
@@ -835,9 +869,14 @@ h1 {
   border: 1px solid var(--border);
   background: rgba(178, 77, 25, 0.06);
   color: var(--muted);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .citation-card__index {
+  flex: 0 0 auto;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 1rem;
   color: var(--accent);
@@ -996,6 +1035,20 @@ h1 {
   margin: 4px 0 0;
   color: var(--muted);
   line-height: 1.35;
+}
+
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.switch-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--success);
 }
 
 .admin-section {
@@ -1163,6 +1216,12 @@ h1 {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.trace-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .trace-details summary {
@@ -1355,7 +1414,6 @@ h1 {
   .section-card__header,
   .provider-card,
   .provider-card__actions,
-  .citation-card,
   .preset-list__header,
   .result-summary,
   .workspace-summary {

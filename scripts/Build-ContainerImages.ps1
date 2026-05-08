@@ -41,6 +41,33 @@ function Invoke-Docker {
     }
 }
 
+function Invoke-DockerOutput {
+    param([string[]]$DockerArgs)
+    $output = & docker @DockerArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "docker $($DockerArgs -join ' ') failed with exit code $LASTEXITCODE"
+    }
+    return ($output -join "`n")
+}
+
+function Get-ImageDigestRecord {
+    param([string]$Image)
+    $imageId = Invoke-DockerOutput -DockerArgs @("image", "inspect", $Image, "--format", "{{.Id}}")
+    $repoDigestsJson = Invoke-DockerOutput -DockerArgs @("image", "inspect", $Image, "--format", "{{json .RepoDigests}}")
+    $repoDigests = @()
+    if ($repoDigestsJson -and $repoDigestsJson -ne "<no value>") {
+        $parsed = $repoDigestsJson | ConvertFrom-Json
+        if ($parsed) {
+            $repoDigests = @($parsed)
+        }
+    }
+    [ordered]@{
+        image = $Image
+        image_id = $imageId.Trim()
+        repo_digests = $repoDigests
+    }
+}
+
 Write-Host "Building HyperSearch API image $localApi" -ForegroundColor Cyan
 Invoke-Docker -DockerArgs @("build", "-t", $localApi, $apiContext)
 
@@ -59,9 +86,9 @@ foreach ($tagSet in $registryTags) {
 }
 
 $thirdPartyImages = @(
-    "caddy:2-alpine",
-    "valkey/valkey:8-alpine",
-    "searxng/searxng:latest"
+    "caddy:2.11.2-alpine",
+    "valkey/valkey:8.1.6-alpine",
+    "searxng/searxng:2026.4.13-ee66b070a"
 )
 
 if ($SaveArchive) {
@@ -89,6 +116,16 @@ if ($SaveArchive) {
     Write-Host "Saving image archive $ArchivePath" -ForegroundColor Cyan
     Invoke-Docker -DockerArgs (@("save", "-o", $ArchivePath) + $saveImages)
     Get-FileHash -Algorithm SHA256 -Path $ArchivePath | Format-List
+    $manifestPath = "$ArchivePath.manifest.json"
+    $manifest = [ordered]@{
+        version = $Version
+        created_at = (Get-Date).ToUniversalTime().ToString("o")
+        archive = $ArchivePath
+        archive_sha256 = (Get-FileHash -Algorithm SHA256 -Path $ArchivePath).Hash
+        images = @($saveImages | ForEach-Object { Get-ImageDigestRecord -Image $_ })
+    }
+    $manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $manifestPath
+    Write-Host "Wrote image digest manifest $manifestPath" -ForegroundColor Cyan
 }
 
 Write-Host "Container image build complete." -ForegroundColor Green

@@ -188,6 +188,56 @@ class Database:
         ).fetchone()
         return row["name"] if row else None
 
+    def get_app_setting(self, key: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            """
+            SELECT key, value_json, source, updated_at
+            FROM app_settings
+            WHERE key = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "key": row["key"],
+            "value": json.loads(row["value_json"]),
+            "source": row["source"],
+            "updated_at": row["updated_at"],
+        }
+
+    def set_app_setting(self, key: str, value: Any, *, source: str = "app") -> None:
+        with self._lock:
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value_json, source, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value_json = excluded.value_json,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (key, json.dumps(value, ensure_ascii=True), source, _utcnow()),
+            )
+            self.connection.commit()
+
+    def seed_app_setting(self, key: str, value: Any, *, source: str = "default") -> None:
+        with self._lock:
+            exists = self.connection.execute(
+                "SELECT 1 FROM app_settings WHERE key = ?",
+                (key,),
+            ).fetchone()
+            if exists:
+                return
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value_json, source, updated_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (key, json.dumps(value, ensure_ascii=True), source, _utcnow()),
+            )
+            self.connection.commit()
+
     def save_preset(self, *, name: str, payload: dict[str, Any]) -> SearchPresetRecord:
         created_at = _utcnow()
         with self._lock:

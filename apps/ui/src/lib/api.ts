@@ -9,6 +9,7 @@ export interface SearchRequest {
   page: number;
   results_per_page: number;
   max_pages: number;
+  target_result_count?: number | null;
   safe_search: number;
   dedupe: boolean;
   fetch_pages: boolean;
@@ -52,6 +53,7 @@ export interface ResearchRequest {
   page: number;
   results_per_page: number;
   max_pages: number;
+  target_result_count?: number | null;
   safe_search: number;
   top_n: number;
   timeout_ms?: number | null;
@@ -99,6 +101,10 @@ export interface ProviderInfo {
   is_default: boolean;
   healthy?: boolean | null;
   detail?: string | null;
+  generation_ok?: boolean | null;
+  model_available?: boolean | null;
+  latency_ms?: number | null;
+  models?: string[] | null;
 }
 
 export interface ProviderProfileUpdate {
@@ -116,11 +122,62 @@ export interface ProviderModelsResponse {
   models: string[];
 }
 
+export interface ProviderDraftRequest {
+  name: string;
+  provider_type: "openai-compatible";
+  base_url?: string | null;
+  model?: string | null;
+  enabled: boolean;
+}
+
+export interface ProviderTestResponse {
+  ok: boolean;
+  detail: string;
+  provider?: string | null;
+  base_url?: string | null;
+  model?: string | null;
+  model_available?: boolean | null;
+  generation_ok?: boolean | null;
+  latency_ms?: number | null;
+  models?: string[] | null;
+}
+
+export interface LlmCapability {
+  enabled: boolean;
+  ready: boolean;
+  mode: string;
+  detail?: string | null;
+  provider?: string | null;
+  base_url?: string | null;
+  model?: string | null;
+  models?: string[] | null;
+  model_available?: boolean | null;
+  generation_ok?: boolean | null;
+  latency_ms?: number | null;
+}
+
+export interface SearchCapability {
+  enabled: boolean;
+  ready: boolean;
+  mode: string;
+  detail?: string | null;
+}
+
+export interface LlmSettings {
+  enabled: boolean;
+  reason?: string | null;
+  source?: string | null;
+}
+
 export interface ReadinessResponse {
   status: "ready" | "degraded";
   service: string;
   environment: string;
   checks: Record<string, unknown>;
+  capabilities?: {
+    search?: SearchCapability;
+    llm?: LlmCapability;
+  };
 }
 
 export interface SearchPreset {
@@ -280,10 +337,21 @@ export function getReadiness() {
   return apiFetchJson<ReadinessResponse>("/v1/ready").then((result) => result.body);
 }
 
-export function testProvider(name: string) {
-  return apiFetch<{ ok: boolean; detail: string }>("/v1/providers/test", {
+export function getLlmSettings() {
+  return apiFetch<LlmSettings>("/v1/admin/llm");
+}
+
+export function updateLlmSettings(payload: { enabled: boolean; reason?: string | null }) {
+  return apiFetch<LlmSettings>("/v1/admin/llm", {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function testProvider(payload: ProviderDraftRequest) {
+  return apiFetch<ProviderTestResponse>("/v1/providers/test", {
     method: "POST",
-    body: JSON.stringify({ name })
+    body: JSON.stringify(payload)
   });
 }
 
@@ -305,10 +373,17 @@ export function listProviderModels(name: string) {
   return apiFetch<ProviderModelsResponse>(`/v1/providers/${name}/models`);
 }
 
-export function verifyProviderModel(name: string) {
-  return apiFetch<Record<string, unknown>>(`/v1/providers/${name}/verify-model`, {
+export function discoverDraftProviderModels(payload: ProviderDraftRequest) {
+  return apiFetch<ProviderModelsResponse>("/v1/providers/models", {
     method: "POST",
-    body: JSON.stringify({})
+    body: JSON.stringify(payload)
+  });
+}
+
+export function verifyProviderModel(payload: ProviderDraftRequest) {
+  return apiFetch<Record<string, unknown>>(`/v1/providers/${payload.name}/verify-model`, {
+    method: "POST",
+    body: JSON.stringify(payload)
   });
 }
 

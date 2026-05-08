@@ -6,7 +6,7 @@
 - Request IDs and trace IDs are included on every request.
 - Common secret-bearing headers are redacted before structured logging.
 - Desktop and installer command logs are written separately from the event timeline so Docker/Compose stdout and stderr are preserved for diagnosis.
-- Desktop diagnostics export redacts env secrets and bundles logs, Docker status, Compose config, and recent service logs.
+- Desktop diagnostics export redacts token, key, password, auth, and credential values across env files, Compose output, command logs, copied desktop logs, Docker status, and recent service logs.
 
 ## Metrics
 
@@ -17,7 +17,7 @@
 ## Health
 
 - `GET /v1/live` reports process liveness.
-- `GET /v1/ready` reports readiness for SearXNG, cache, and default local provider.
+- `GET /v1/ready` reports search-core readiness for SearXNG and cache, plus separate `capabilities.search` and `capabilities.llm` details.
 - `GET /v1/health` remains a detailed compatibility endpoint and may report degraded status when dependencies are unavailable.
 
 ## Cache
@@ -40,11 +40,13 @@
 
 - 1.0 supports local OpenAI-compatible providers only: LM Studio, local vLLM, and local llama.cpp.
 - Provider profiles contain endpoint, preferred model, display name, enabled state, and default state.
-- Research verifies that the default or requested local model is available before synthesis.
+- Search-only is valid. `GET/PATCH /v1/admin/llm` controls app-level LLM usage locally; provider discovery/testing can still contact local endpoints while LLM usage is globally off.
+- Research verifies that the default or requested local model is available before synthesis. If LLM is disabled or unavailable, `/v1/research` returns source-review fallback with `trace.mode="search-only-fallback"`.
 
 ## Installer Operations
 
 - Release startup uses prebuilt images and does not build on the user machine.
-- Full media loads image archives with `docker load`.
+- Caddy, Valkey, and SearXNG release images are pinned to exact tags. Full media loads image archives with `docker load` and includes image digest manifests.
 - Online media runs `docker compose pull` and reports registry, DNS, proxy, or private-image failures before setup claims success.
 - Docker readiness requires a clean server-version response, not just any Docker command output.
+- Docker doctor output includes local/user Docker config permission checks, Docker context, named-pipe access, Docker Desktop service state, and `docker-users` group membership remediation.

@@ -86,6 +86,18 @@ def test_local_proxy_access_is_allowed_without_lan_token(monkeypatch):
     assert response.status_code == 200
 
 
+def test_spoofed_proxy_marker_from_lan_client_is_rejected(monkeypatch):
+    monkeypatch.setenv("HYPERSEARCH_LAN_ENABLED", "false")
+    monkeypatch.delenv("HYPERSEARCH_PAIRING_TOKEN", raising=False)
+    headers = {
+        "X-HyperSearch-Proxy": "caddy",
+        "X-Forwarded-For": "127.0.0.1",
+    }
+    with TestClient(app, client=("192.168.1.25", 50000)) as client:
+        response = client.get("/v1/metrics", headers=headers)
+    assert response.status_code == 403
+
+
 def test_lan_proxy_access_requires_token_when_lan_enabled(monkeypatch):
     monkeypatch.setenv("HYPERSEARCH_LAN_ENABLED", "true")
     monkeypatch.setenv("HYPERSEARCH_PAIRING_TOKEN", "paired")

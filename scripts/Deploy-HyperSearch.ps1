@@ -104,7 +104,65 @@ function Test-DockerDesktopReady {
   }
 
   if (-not $ready) {
+    Write-DockerDoctor
     throw "Docker Desktop is installed but the Docker engine is not ready. Open Docker Desktop and wait for startup to complete, then retry."
+  }
+}
+
+function Write-DockerDoctor {
+  Write-Host "Docker doctor checks" -ForegroundColor Cyan
+  Write-Host "Isolated DOCKER_CONFIG: $dockerConfigPath"
+  try {
+    $testPath = Join-Path $dockerConfigPath "hypersearch-write-test.tmp"
+    Set-Content -Path $testPath -Value "ok" -ErrorAction Stop
+    Remove-Item -LiteralPath $testPath -Force -ErrorAction SilentlyContinue
+    Write-Host "Local .docker config: writable" -ForegroundColor Green
+  } catch {
+    Write-Host "Local .docker config: not writable. Remediation: move HyperSearch to a user-writable folder or repair ACLs for $dockerConfigPath" -ForegroundColor Yellow
+  }
+  $userDockerConfig = Join-Path $env:USERPROFILE ".docker\config.json"
+  $userDockerConfigExists = $false
+  $userDockerConfigChecked = $true
+  try {
+    $userDockerConfigExists = Test-Path $userDockerConfig -ErrorAction Stop
+  } catch {
+    $userDockerConfigChecked = $false
+    Write-Host "User Docker config: access denied while checking ($userDockerConfig). Remediation: repair that file's ACLs or remove the stale config." -ForegroundColor Yellow
+  }
+  if ($userDockerConfigExists) {
+    try {
+      Get-Content -Path $userDockerConfig -TotalCount 1 -ErrorAction Stop | Out-Null
+      Write-Host "User Docker config: readable ($userDockerConfig)" -ForegroundColor Green
+    } catch {
+      Write-Host "User Docker config: access denied ($userDockerConfig). Remediation: repair that file's ACLs or remove the stale config." -ForegroundColor Yellow
+    }
+  } elseif ($userDockerConfigChecked) {
+    Write-Host "User Docker config: not present"
+  }
+  try {
+    Write-Host "Docker context: $((& docker context show 2>&1 | Out-String).Trim())"
+  } catch {
+    Write-Host "Docker context unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+  try {
+    $pipe = Get-Item "\\.\pipe\docker_engine" -ErrorAction Stop
+    Write-Host "Docker named pipe: visible ($($pipe.FullName))" -ForegroundColor Green
+  } catch {
+    Write-Host "Docker named pipe: not accessible. Remediation: start Docker Desktop and verify this user can access the engine pipe." -ForegroundColor Yellow
+  }
+  if (Get-Command sc.exe -ErrorAction SilentlyContinue) {
+    Write-Host "Docker Desktop service:"
+    sc.exe query com.docker.service
+  }
+  try {
+    $groups = (& whoami /groups 2>&1 | Out-String)
+    if ($groups.ToLowerInvariant().Contains("docker-users")) {
+      Write-Host "docker-users group: current user appears to be a member" -ForegroundColor Green
+    } else {
+      Write-Host "docker-users group: current user not reported as a member. Remediation: add this account to docker-users, sign out, then sign back in." -ForegroundColor Yellow
+    }
+  } catch {
+    Write-Host "docker-users group check failed: $($_.Exception.Message)" -ForegroundColor Yellow
   }
 }
 
@@ -182,6 +240,7 @@ switch ($Action) {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
       & docker --version
     }
+    Write-DockerDoctor
     Test-DockerDesktopReady
     Invoke-DockerCompose -ComposeArgs @("config", "--quiet")
     Write-Host "Compose config is valid." -ForegroundColor Green

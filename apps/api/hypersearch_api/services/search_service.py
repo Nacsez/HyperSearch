@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import httpx
+from math import ceil
 from typing import Any
 from uuid import uuid4
 
@@ -52,6 +53,7 @@ class SearchService:
             "search",
             {
                 "normalized_key": normalized.cache_key(),
+                "target_result_count": self._target_result_count(request, normalized),
                 "fetch_pages": request.fetch_pages,
                 "extract_text": request.extract_text,
                 "dedupe": request.dedupe,
@@ -115,10 +117,16 @@ class SearchService:
         search_cache_state: str,
         should_write_history: bool,
     ) -> dict[str, Any]:
-        pages = range(normalized.page, normalized.page + normalized.max_pages)
+        collection_plan = self._collection_plan(request, normalized)
+        pages = range(
+            normalized.page,
+            normalized.page + collection_plan["page_budget"],
+        )
         results: list[dict[str, Any]] = []
         raw_pages: list[dict[str, Any]] = []
+        pages_attempted: list[int] = []
         for page in pages:
+            pages_attempted.append(page)
             try:
                 body = await self.searx_client.search(
                     query=normalized.query,
@@ -127,7 +135,7 @@ class SearchService:
                     language=normalized.language,
                     time_range=normalized.time_range,
                     page=page,
-                    results_per_page=normalized.results_per_page,
+                    results_per_page=collection_plan["searx_results_per_page"],
                     safe_search=normalized.safe_search,
                     timeout_ms=normalized.timeout_ms,
                 )
@@ -164,9 +172,16 @@ class SearchService:
                         "extracted": False,
                     }
                 )
+            if request.dedupe:
+                if len(self.dedupe_service.dedupe(results)) >= collection_plan["target_result_count"]:
+                    break
+            elif len(results) >= collection_plan["target_result_count"]:
+                break
         if request.dedupe:
             results = self.dedupe_service.dedupe(results)
         results = self.ranking_service.rank(results)
+        result_shortfall = max(0, collection_plan["target_result_count"] - len(results))
+        results = results[: collection_plan["target_result_count"]]
         if request.fetch_pages or request.extract_text:
             results = await self._hydrate_results(
                 results,
@@ -223,6 +238,11 @@ class SearchService:
             },
             "debug": {
                 "pages_fetched": len(raw_pages),
+                "pages_attempted": pages_attempted,
+                "target_result_count": collection_plan["target_result_count"],
+                "searx_results_per_page": collection_plan["searx_results_per_page"],
+                "page_budget": collection_plan["page_budget"],
+                "result_shortfall": result_shortfall,
                 "searx_pages": raw_pages,
             },
         }
@@ -236,6 +256,36 @@ class SearchService:
                 debug_payload=payload["debug"] if self.settings.debug else None,
             )
         return payload
+
+    def _target_result_count(self, request, normalized) -> int:
+        configured_cap = max(1, self.settings.max_results_per_page * self.settings.max_pages)
+        requested = getattr(request, "target_result_count", None)
+        if requested is None:
+            requested = normalized.results_per_page * normalized.max_pages
+        return min(configured_cap, max(1, int(requested)))
+
+    def _collection_plan(self, request, normalized) -> dict[str, int]:
+        target_result_count = self._target_result_count(request, normalized)
+        if target_result_count <= self.settings.max_results_per_page:
+            searx_results_per_page = min(10, target_result_count)
+        else:
+            searx_results_per_page = min(
+                self.settings.max_results_per_page,
+                target_result_count,
+            )
+        searx_results_per_page = max(1, searx_results_per_page)
+        page_budget = max(
+            normalized.max_pages,
+            ceil(target_result_count / searx_results_per_page),
+        )
+        if request.dedupe and page_budget < self.settings.max_pages:
+            page_budget += 1
+        page_budget = min(self.settings.max_pages, max(1, page_budget))
+        return {
+            "target_result_count": target_result_count,
+            "searx_results_per_page": searx_results_per_page,
+            "page_budget": page_budget,
+        }
 
     async def _hydrate_results(
         self,

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { HistoryRecord, ProviderInfo, ProviderProfileUpdate, ReadinessResponse } from "../../lib/api";
+import type {
+  HistoryRecord,
+  LlmSettings,
+  ProviderDraftRequest,
+  ProviderInfo,
+  ProviderProfileUpdate,
+  ReadinessResponse
+} from "../../lib/api";
 
 interface AdminPanelProps {
   providers: ProviderInfo[];
@@ -9,11 +16,13 @@ interface AdminPanelProps {
   pairingToken: string;
   lastMessage: string;
   readiness?: ReadinessResponse;
+  llmSettings?: LlmSettings;
   history: HistoryRecord[];
   onPairingTokenChange: (value: string) => void;
-  onTestProvider: (name: string) => void;
-  onVerifyProvider: (name: string) => void;
-  onDiscoverModels: (name: string) => Promise<string[]>;
+  onLlmSettingsChange: (settings: { enabled: boolean; reason?: string | null }) => void;
+  onTestProvider: (draft: ProviderDraftRequest) => void;
+  onVerifyProvider: (draft: ProviderDraftRequest) => void;
+  onDiscoverModels: (draft: ProviderDraftRequest) => Promise<string[]>;
   onSetDefaultProvider: (name: string) => void;
   onUpdateProvider: (name: string, profile: ProviderProfileUpdate) => void;
   onInvalidateCache: (namespace: string) => void;
@@ -28,10 +37,13 @@ function defaultEndpoint(provider: ProviderInfo) {
   return provider.base_url ?? "";
 }
 
-function modelChoices(provider: ProviderInfo, discoveredModels: string[]) {
+function modelChoices(provider: ProviderInfo, discoveredModels: string[], currentModel: string) {
   const values = new Set(discoveredModels);
   if (provider.model) {
     values.add(provider.model);
+  }
+  if (currentModel) {
+    values.add(currentModel);
   }
   return Array.from(values).sort((left, right) => left.localeCompare(right));
 }
@@ -43,8 +55,10 @@ export function AdminPanel({
   pairingToken,
   lastMessage,
   readiness,
+  llmSettings,
   history,
   onPairingTokenChange,
+  onLlmSettingsChange,
   onTestProvider,
   onVerifyProvider,
   onDiscoverModels,
@@ -56,6 +70,8 @@ export function AdminPanel({
 }: AdminPanelProps) {
   const readinessStatus = readiness?.status ?? "unknown";
   const readinessTone = readinessStatus === "ready" ? "ok" : readinessStatus === "degraded" ? "warning" : "muted";
+  const llmCapability = readiness?.capabilities?.llm;
+  const effectiveLlmEnabled = llmSettings?.enabled ?? llmCapability?.enabled ?? false;
   const confirmInvalidate = (namespace: string) => {
     if (window.confirm(`Invalidate the ${namespace} cache? Cached ${namespace} work will be recomputed on the next request.`)) {
       onInvalidateCache(namespace);
@@ -78,6 +94,29 @@ export function AdminPanel({
       </div>
 
       <section className="admin-action-grid" aria-label="Operations actions">
+        <article className="admin-action-card">
+          <div>
+            <strong>LLM features</strong>
+            <p>
+              {effectiveLlmEnabled
+                ? llmCapability?.ready
+                  ? "Local synthesis is enabled and ready."
+                  : "Local synthesis is enabled but the selected provider is not ready."
+                : "Search-only mode is enabled. Search and source review remain available."}
+            </p>
+          </div>
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              checked={effectiveLlmEnabled}
+              onChange={(event) => onLlmSettingsChange({
+                enabled: event.target.checked,
+                reason: event.target.checked ? null : "Disabled from Operations"
+              })}
+            />
+            <span>{effectiveLlmEnabled ? "LLM on" : "LLM off"}</span>
+          </label>
+        </article>
         <article className="admin-action-card">
           <div>
             <strong>Refresh local history</strong>
@@ -178,9 +217,9 @@ function ProviderEditor({
   provider: ProviderInfo;
   discoveredModels: string[];
   modelsLoading: boolean;
-  onDiscoverModels: (name: string) => Promise<string[]>;
-  onTestProvider: (name: string) => void;
-  onVerifyProvider: (name: string) => void;
+  onDiscoverModels: (draft: ProviderDraftRequest) => Promise<string[]>;
+  onTestProvider: (draft: ProviderDraftRequest) => void;
+  onVerifyProvider: (draft: ProviderDraftRequest) => void;
   onSetDefaultProvider: (name: string) => void;
   onUpdateProvider: (name: string, profile: ProviderProfileUpdate) => void;
 }) {
@@ -189,7 +228,7 @@ function ProviderEditor({
   const [model, setModel] = useState(provider.model ?? "");
   const [enabled, setEnabled] = useState(provider.enabled);
   const [makeDefault, setMakeDefault] = useState(provider.is_default);
-  const choices = useMemo(() => modelChoices(provider, discoveredModels), [provider, discoveredModels]);
+  const choices = useMemo(() => modelChoices(provider, discoveredModels, model), [provider, discoveredModels, model]);
 
   useEffect(() => {
     setDisplayName(provider.display_name ?? provider.name);
@@ -210,8 +249,16 @@ function ProviderEditor({
     });
   };
 
+  const draftPayload = (): ProviderDraftRequest => ({
+    name: provider.name,
+    provider_type: "openai-compatible",
+    base_url: baseUrl.trim() || null,
+    model: model.trim() || null,
+    enabled
+  });
+
   const discoverModels = async () => {
-    const models = await onDiscoverModels(provider.name);
+    const models = await onDiscoverModels(draftPayload());
     if (!model && models[0]) {
       setModel(models[0]);
     }
@@ -273,10 +320,10 @@ function ProviderEditor({
         <button type="button" className="button button--ghost" onClick={discoverModels} disabled={modelsLoading}>
           {modelsLoading ? "Discovering..." : "Discover models"}
         </button>
-        <button type="button" className="button button--ghost" onClick={() => onTestProvider(provider.name)}>
+        <button type="button" className="button button--ghost" onClick={() => onTestProvider(draftPayload())}>
           Test
         </button>
-        <button type="button" className="button button--ghost" onClick={() => onVerifyProvider(provider.name)}>
+        <button type="button" className="button button--ghost" onClick={() => onVerifyProvider(draftPayload())}>
           Verify model
         </button>
         {!provider.is_default ? (

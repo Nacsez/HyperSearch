@@ -20,8 +20,10 @@ class ScriptedProvider:
 
     def __init__(self, script) -> None:
         self.script = list(script)
+        self.prompts = []
 
     async def chat(self, *, messages, temperature=0.2, stream=False, timeout_ms=None, max_tokens=None):
+        self.prompts.append(messages[-1].content)
         next_item = self.script.pop(0)
         if isinstance(next_item, Exception):
             raise next_item
@@ -87,3 +89,24 @@ async def test_final_research_timeout_returns_staged_evidence_not_raw_quote_coll
     assert "could not complete the final synthesis step" in payload["answer"]
     assert "batch synopsis [1]" in payload["answer"]
     assert "TimeoutError" in payload["error"]
+
+
+@pytest.mark.asyncio
+async def test_context_budget_error_retries_with_smaller_prompt():
+    provider = ScriptedProvider(
+        [
+            RuntimeError("context length exceeded"),
+            "ok after retry",
+        ]
+    )
+    service = SynthesizeService(FakeProviderService(provider))
+
+    completion = await service._chat(
+        provider=provider,
+        system="Answer briefly.",
+        user="x" * 6000,
+        prompt_budget_chars=5000,
+    )
+
+    assert completion.content == "ok after retry"
+    assert len(provider.prompts[1]) < len(provider.prompts[0])

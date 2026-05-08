@@ -15,21 +15,29 @@ async def live():
 @router.get("/v1/ready", dependencies=[Depends(require_access)])
 async def ready(request: Request, response: Response):
     searx = await request.app.state.searx_client.healthcheck()
-    providers = await request.app.state.provider_service.list_providers()
-    default_provider = next((item for item in providers if item.get("is_default")), None)
+    llm = await request.app.state.provider_service.llm_capability()
+    cache_mode = "valkey" if getattr(request.app.state.cache, "_redis", None) is not None else "memory"
+    search_ready = bool(searx.get("ok"))
     checks = {
         "searxng": searx,
-        "default_provider": default_provider,
-        "cache": {"ok": True, "detail": "available"},
+        "cache": {"ok": True, "detail": "available", "mode": cache_mode},
     }
-    ok = bool(searx.get("ok")) and bool(default_provider and default_provider.get("healthy"))
-    if not ok:
+    if not search_ready:
         response.status_code = 503
     return {
-        "status": "ready" if ok else "degraded",
+        "status": "ready" if search_ready else "degraded",
         "service": "hypersearch",
         "environment": request.app.state.settings.environment,
         "checks": checks,
+        "capabilities": {
+            "search": {
+                "enabled": True,
+                "ready": search_ready,
+                "mode": "search",
+                "detail": searx.get("detail") or ("ready" if search_ready else "SearXNG unavailable"),
+            },
+            "llm": llm,
+        },
     }
 
 

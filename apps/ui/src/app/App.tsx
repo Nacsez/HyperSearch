@@ -8,19 +8,20 @@ import { ResearchPane } from "../features/research/ResearchPane";
 import { SearchCommand, SearchSettings, SearchFormState } from "../features/search/SearchForm";
 import { SearchResults } from "../features/search/SearchResults";
 import {
-  ProviderInfo,
+  ProviderDraftRequest,
   ResearchResponse,
   SearchPreset,
   SearchResponse,
   applyHistoryRetention,
   deletePreset,
+  discoverDraftProviderModels,
   generateSessionTitle,
+  getLlmSettings,
   getReadiness,
   getStoredPairingToken,
   hydratePairingTokenFromUrl,
   invalidateCache,
   listHistory,
-  listProviderModels,
   listPresets,
   listProviders,
   runResearch,
@@ -29,6 +30,7 @@ import {
   setDefaultProvider,
   setStoredPairingToken,
   testProvider,
+  updateLlmSettings,
   updateProviderProfile,
   verifyProviderModel
 } from "../lib/api";
@@ -43,6 +45,7 @@ const INITIAL_FORM: SearchFormState = {
   page: 1,
   results_per_page: 10,
   max_pages: 1,
+  target_results: 10,
   safe_search: 1,
   dedupe: true,
   fetch_pages: false,
@@ -94,12 +97,15 @@ export interface XmlExportOptions {
 const SESSION_INDEX_KEY = "hypersearch_session_index";
 const MIN_UI_ZOOM = 0.5;
 const MAX_UI_ZOOM = 2;
+const MAX_FORM_RESULTS = 250;
+const MAX_REQUEST_TIMEOUT_MS = 600000;
 const SESSION_RESULT_CONTENT_LIMIT = 1200;
 const SESSION_SNIPPET_LIMIT = 700;
 const SESSION_ANSWER_LIMIT = 120000;
 const SESSION_TRACE_TEXT_LIMIT = 1200;
 const XML_EXPORT_OPTIONS_KEY = "hypersearch_xml_export_options";
 const DEFAULT_PRESET_KEY = "hypersearch_default_preset_id";
+const DEFAULT_PRESET_FORM_KEY = "hypersearch_default_preset_form";
 const DEFAULT_XML_EXPORT_OPTIONS: XmlExportOptions = {
   metadata: true,
   question: true,
@@ -121,6 +127,7 @@ function buildPresetSettings(form: SearchFormState) {
     page: form.page,
     results_per_page: form.results_per_page,
     max_pages: form.max_pages,
+    target_result_count: form.target_results,
     safe_search: form.safe_search,
     dedupe: form.dedupe,
     fetch_pages: form.fetch_pages,
@@ -132,6 +139,92 @@ function buildPresetSettings(form: SearchFormState) {
     timeout_ms: form.timeout_ms,
     cache_policy: form.cache_policy
   };
+}
+
+function clampFormInt(value: unknown, fallback: number, min: number, max: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
+function normalizeStoredForm(form?: Partial<SearchFormState> | null): SearchFormState {
+  const raw = (form ?? {}) as Partial<SearchFormState> & { target_result_count?: number | null };
+  const merged = { ...INITIAL_FORM, ...raw };
+  const resultsPerPage = clampFormInt(merged.results_per_page, INITIAL_FORM.results_per_page, 1, 50);
+  const maxPages = clampFormInt(merged.max_pages, INITIAL_FORM.max_pages, 1, 5);
+  const fallbackTarget = resultsPerPage * maxPages;
+  return {
+    ...merged,
+    page: clampFormInt(merged.page, INITIAL_FORM.page, 1, 20),
+    results_per_page: resultsPerPage,
+    max_pages: maxPages,
+    target_results: clampFormInt(raw.target_results ?? raw.target_result_count, fallbackTarget, 1, MAX_FORM_RESULTS),
+    safe_search: clampFormInt(merged.safe_search, INITIAL_FORM.safe_search, 0, 2),
+    top_n: clampFormInt(merged.top_n, INITIAL_FORM.top_n, 1, MAX_FORM_RESULTS),
+    timeout_ms: clampFormInt(merged.timeout_ms, INITIAL_FORM.timeout_ms, 1000, MAX_REQUEST_TIMEOUT_MS)
+  };
+}
+
+function formFromPresetRequest(request: Record<string, unknown>, current: SearchFormState = INITIAL_FORM): SearchFormState {
+  const resultsPerPage = clampFormInt(request.results_per_page, current.results_per_page, 1, 50);
+  const maxPages = clampFormInt(request.max_pages, current.max_pages, 1, 5);
+  const fallbackTarget = resultsPerPage * maxPages;
+  return normalizeStoredForm({
+    ...current,
+    engines: Array.isArray(request.engines) ? request.engines.join(",") : "",
+    categories: Array.isArray(request.categories) ? request.categories.join(",") : "",
+    language: String(request.language ?? ""),
+    time_range: String(request.time_range ?? ""),
+    page: clampFormInt(request.page, 1, 1, 20),
+    results_per_page: resultsPerPage,
+    max_pages: maxPages,
+    target_results: clampFormInt(
+      request.target_result_count ?? request.target_results,
+      fallbackTarget,
+      1,
+      MAX_FORM_RESULTS
+    ),
+    safe_search: clampFormInt(request.safe_search, current.safe_search, 0, 2),
+    top_n: clampFormInt(request.top_n, current.top_n, 1, MAX_FORM_RESULTS),
+    dedupe: Boolean(request.dedupe ?? true),
+    fetch_pages: Boolean(request.fetch_pages ?? false),
+    extract_text: Boolean(request.extract_text ?? false),
+    summarize: Boolean(request.summarize ?? false),
+    auto_name_session: Boolean(request.auto_name_session ?? true),
+    provider: String(request.provider ?? ""),
+    cache_policy: (request.cache_policy as SearchFormState["cache_policy"]) ?? "use",
+    timeout_ms: clampFormInt(request.timeout_ms, current.timeout_ms, 1000, MAX_REQUEST_TIMEOUT_MS)
+  });
+}
+
+function loadDefaultPresetForm() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DEFAULT_PRESET_FORM_KEY) ?? "null");
+    if (!parsed?.form) {
+      return null;
+    }
+    return normalizeStoredForm(parsed.form);
+  } catch {
+    return null;
+  }
+}
+
+function saveDefaultPresetForm(preset: SearchPreset) {
+  try {
+    window.localStorage.setItem(
+      DEFAULT_PRESET_FORM_KEY,
+      JSON.stringify({
+        preset_id: preset.preset_id,
+        name: preset.name,
+        savedAt: new Date().toISOString(),
+        form: formFromPresetRequest(preset.request as unknown as Record<string, unknown>)
+      })
+    );
+  } catch (error) {
+    console.warn("HyperSearch could not persist the default preset form.", error);
+  }
 }
 
 function getSessionParam(name: string) {
@@ -465,17 +558,6 @@ function shortId(value: string | undefined) {
   return value ? value.slice(0, 8) : "n/a";
 }
 
-function describeProvider(provider: ProviderInfo | undefined) {
-  if (!provider) {
-    return "Provider unknown";
-  }
-  const label = provider.display_name ?? provider.name;
-  if (provider.healthy == null) {
-    return `${label} not configured`;
-  }
-  return provider.healthy ? `${label} ready` : `${label} unreachable`;
-}
-
 function summarizeSearch(payload: SearchResponse) {
   return `${payload.result_count} results for "${payload.query}"`;
 }
@@ -492,6 +574,45 @@ function summarizeResearch(payload: ResearchResponse) {
   return `${citationCount(payload)} citations for "${payload.query}"`;
 }
 
+function requestedResultCount(form: SearchFormState) {
+  return clampFormInt(form.target_results, form.results_per_page * form.max_pages, 1, MAX_FORM_RESULTS);
+}
+
+function withElapsed(message: string, elapsedSeconds: number) {
+  return elapsedSeconds > 0 ? `${message} (${elapsedSeconds}s)` : message;
+}
+
+function describeSearchProgress(form: SearchFormState, elapsedSeconds: number) {
+  const target = requestedResultCount(form);
+  if (elapsedSeconds < 6) {
+    return withElapsed(`Collecting result pages for up to ${target} results`, elapsedSeconds);
+  }
+  if ((form.fetch_pages || form.extract_text) && elapsedSeconds >= 12) {
+    return withElapsed("Fetching and extracting selected result pages", elapsedSeconds);
+  }
+  if (elapsedSeconds < 20) {
+    return withElapsed("Deduplicating and ranking collected results", elapsedSeconds);
+  }
+  return withElapsed("Still working through SearXNG, cache, and local fetches", elapsedSeconds);
+}
+
+function describeResearchProgress(form: SearchFormState, llmReady: boolean, elapsedSeconds: number) {
+  const target = Math.max(requestedResultCount(form), form.top_n);
+  if (elapsedSeconds < 6) {
+    return withElapsed(`Collecting up to ${target} search results`, elapsedSeconds);
+  }
+  if (elapsedSeconds < 18) {
+    return withElapsed(`Fetching and extracting up to ${form.top_n} source pages`, elapsedSeconds);
+  }
+  if (elapsedSeconds < 45) {
+    return withElapsed(
+      llmReady ? "Building source notes with the selected local model" : "Preparing source review from collected pages",
+      elapsedSeconds
+    );
+  }
+  return withElapsed("Consolidating evidence, citations, and final response", elapsedSeconds);
+}
+
 function isAutoGeneratedSessionName(value: string) {
   return !value.trim() || value === "Untitled Session" || /^Session\s+\d+$/i.test(value.trim());
 }
@@ -501,7 +622,10 @@ export function App() {
   const [sessionName, setSessionName] = useState(() => getInitialSessionName(sessionId));
   const [sessionIndex, setSessionIndex] = useState(() => loadSessionIndex());
   const initialSnapshot = loadSessionSnapshot(sessionId);
-  const [form, setForm] = useState<SearchFormState>({ ...INITIAL_FORM, ...(initialSnapshot?.form ?? {}) });
+  const defaultPresetForm = loadDefaultPresetForm();
+  const [form, setForm] = useState<SearchFormState>(() => (
+    initialSnapshot ? normalizeStoredForm(initialSnapshot.form) : normalizeStoredForm(defaultPresetForm)
+  ));
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (window.localStorage.getItem("hypersearch_theme") as "light" | "dark" | null) ?? "light"
   );
@@ -522,7 +646,9 @@ export function App() {
   const [xmlExportOptions, setXmlExportOptions] = useState<XmlExportOptions>(() => loadXmlExportOptions());
   const [searchSettingsExpanded, setSearchSettingsExpanded] = useState(() => window.localStorage.getItem("hypersearch_settings_expanded") !== "false");
   const [defaultPresetId, setDefaultPresetId] = useState(() => window.localStorage.getItem(DEFAULT_PRESET_KEY) ?? "");
-  const [defaultPresetApplied, setDefaultPresetApplied] = useState(Boolean(initialSnapshot));
+  const [defaultPresetApplied, setDefaultPresetApplied] = useState(Boolean(initialSnapshot || defaultPresetForm));
+  const [workStartedAt, setWorkStartedAt] = useState<number | null>(null);
+  const [workClock, setWorkClock] = useState(0);
   const isEmbedded = window.parent && window.parent !== window;
 
   const providersQuery = useQuery({
@@ -538,6 +664,12 @@ export function App() {
   const readinessQuery = useQuery({
     queryKey: ["readiness"],
     queryFn: getReadiness,
+    retry: false
+  });
+
+  const llmSettingsQuery = useQuery({
+    queryKey: ["llm-settings"],
+    queryFn: getLlmSettings,
     retry: false
   });
 
@@ -580,7 +712,7 @@ export function App() {
   });
 
   const maybeAutoNameSession = (query: string, context: string | null | undefined) => {
-    if (!form.auto_name_session || !isAutoGeneratedSessionName(sessionName) || titleMutation.isPending) {
+    if (!llmReady || !form.auto_name_session || !isAutoGeneratedSessionName(sessionName) || titleMutation.isPending) {
       return;
     }
     titleMutation.mutate({
@@ -618,12 +750,13 @@ export function App() {
   const researchMutation = useMutation({
     mutationFn: runResearch,
     onSuccess: (payload) => {
+      const fallbackMode = payload.trace?.mode === "search-only-fallback";
       startTransition(() => {
         setResearchPayload(payload);
         setWorkspaceTab("research");
         recordActivity({
           kind: "research",
-          title: "Research synthesis completed",
+          title: fallbackMode ? "Source review completed" : "Research synthesis completed",
           summary: summarizeResearch(payload),
           payload
         });
@@ -644,6 +777,9 @@ export function App() {
     mutationFn: ({ name }: { name: string }) =>
       savePreset(name, buildPresetSettings(form)),
     onSuccess: async (payload) => {
+      if (payload.preset_id === defaultPresetId) {
+        saveDefaultPresetForm(payload);
+      }
       setAdminMessage("Preset saved.");
       recordActivity({
         kind: "ops",
@@ -661,6 +797,7 @@ export function App() {
       if (payload.preset_id === defaultPresetId) {
         setDefaultPresetId("");
         window.localStorage.removeItem(DEFAULT_PRESET_KEY);
+        window.localStorage.removeItem(DEFAULT_PRESET_FORM_KEY);
       }
       recordActivity({
         kind: "ops",
@@ -674,11 +811,11 @@ export function App() {
 
   const providerTestMutation = useMutation({
     mutationFn: testProvider,
-    onSuccess: (payload, name) => {
+    onSuccess: (payload, draft) => {
       setAdminMessage(payload.detail);
       recordActivity({
         kind: "ops",
-        title: `Provider test: ${name}`,
+        title: `Provider test: ${draft.name}`,
         summary: payload.ok ? payload.detail : `Failed: ${payload.detail}`,
         payload
       });
@@ -696,6 +833,7 @@ export function App() {
         payload
       });
       await queryClient.invalidateQueries({ queryKey: ["providers"] });
+      await queryClient.invalidateQueries({ queryKey: ["readiness"] });
     }
   });
 
@@ -717,35 +855,35 @@ export function App() {
 
   const providerVerifyMutation = useMutation({
     mutationFn: verifyProviderModel,
-    onSuccess: (payload, name) => {
-      setAdminMessage(`Verified ${name}.`);
+    onSuccess: (payload, draft) => {
+      setAdminMessage(`Verified ${draft.name}.`);
       recordActivity({
         kind: "ops",
-        title: `Provider model verified: ${name}`,
+        title: `Provider model verified: ${draft.name}`,
         summary: String(payload.model ?? "model available"),
         payload
       });
     },
-    onError: (error, name) => {
+    onError: (error, draft) => {
       const message = error instanceof Error ? error.message : "Unknown error";
       setAdminMessage(message);
       recordActivity({
         kind: "error",
-        title: `Provider model unavailable: ${name}`,
+        title: `Provider model unavailable: ${draft.name}`,
         summary: message,
         payload: { error: message }
       });
     }
   });
 
-  const discoverProviderModels = async (name: string) => {
-    setProviderModelsLoading((current) => ({ ...current, [name]: true }));
+  const discoverProviderModels = async (draft: ProviderDraftRequest) => {
+    setProviderModelsLoading((current) => ({ ...current, [draft.name]: true }));
     try {
-      const payload = await listProviderModels(name);
-      setProviderModels((current) => ({ ...current, [name]: payload.models }));
+      const payload = await discoverDraftProviderModels(draft);
+      setProviderModels((current) => ({ ...current, [draft.name]: payload.models }));
       recordActivity({
         kind: "ops",
-        title: `Provider models discovered: ${name}`,
+        title: `Provider models discovered: ${draft.name}`,
         summary: `${payload.models.length} models from ${payload.base_url ?? "endpoint"}`,
         payload
       });
@@ -755,15 +893,41 @@ export function App() {
       setAdminMessage(message);
       recordActivity({
         kind: "error",
-        title: `Provider model discovery failed: ${name}`,
+        title: `Provider model discovery failed: ${draft.name}`,
         summary: message,
         payload: { error: message }
       });
       return [];
     } finally {
-      setProviderModelsLoading((current) => ({ ...current, [name]: false }));
+      setProviderModelsLoading((current) => ({ ...current, [draft.name]: false }));
     }
   };
+
+  const llmSettingsMutation = useMutation({
+    mutationFn: updateLlmSettings,
+    onSuccess: async (payload) => {
+      setAdminMessage(payload.enabled ? "LLM features enabled." : "LLM features disabled. Search-only mode is active.");
+      recordActivity({
+        kind: "ops",
+        title: payload.enabled ? "LLM enabled" : "LLM disabled",
+        summary: payload.reason ?? payload.source ?? "application setting updated",
+        payload
+      });
+      await queryClient.invalidateQueries({ queryKey: ["llm-settings"] });
+      await queryClient.invalidateQueries({ queryKey: ["readiness"] });
+      await queryClient.invalidateQueries({ queryKey: ["providers"] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setAdminMessage(message);
+      recordActivity({
+        kind: "error",
+        title: "LLM setting update failed",
+        summary: message,
+        payload: { error: message }
+      });
+    }
+  });
 
   const invalidateMutation = useMutation({
     mutationFn: invalidateCache,
@@ -791,6 +955,8 @@ export function App() {
       await queryClient.invalidateQueries({ queryKey: ["history"] });
     }
   });
+
+  const busy = searchMutation.isPending || researchMutation.isPending;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -835,7 +1001,7 @@ export function App() {
     if (!preset) {
       return;
     }
-    loadPreset(preset);
+    setForm((current) => formFromPresetRequest(preset.request as unknown as Record<string, unknown>, current));
     setDefaultPresetApplied(true);
     recordActivity({
       kind: "ops",
@@ -873,6 +1039,31 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      adjustUiZoom(event.deltaY < 0 ? 0.05 : -0.05);
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, []);
+
+  useEffect(() => {
+    if (!busy) {
+      setWorkStartedAt(null);
+      setWorkClock(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setWorkStartedAt((current) => current ?? startedAt);
+    setWorkClock(startedAt);
+    const timer = window.setInterval(() => setWorkClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
+  useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const data = parseDesktopMessage(event.data);
       if (data?.type !== "hypersearch.exportSession.result") {
@@ -906,8 +1097,15 @@ export function App() {
     setSessionIndex(loadSessionIndex());
   }, [activityLog, form, researchPayload, searchPayload, sessionId, sessionName, workspaceTab]);
 
-  const busy = searchMutation.isPending || researchMutation.isPending;
   const defaultProvider = providersQuery.data?.find((provider) => provider.is_default);
+  const llmCapability = readinessQuery.data?.capabilities?.llm;
+  const llmEnabled = llmSettingsQuery.data?.enabled ?? llmCapability?.enabled ?? false;
+  const llmReady = Boolean(llmEnabled && llmCapability?.ready);
+  const llmStatusLabel = !llmEnabled
+    ? "Search ready / LLM off"
+    : llmReady
+      ? `${defaultProvider?.display_name ?? defaultProvider?.name ?? llmCapability?.provider ?? "LLM"} ready`
+      : "Search ready / LLM unavailable";
   const selectedLog = activityLog.find((entry) => entry.id === selectedLogId) ?? activityLog[0] ?? null;
   const workspaceQuery = workspaceTab === "research"
     ? researchPayload?.query ?? searchPayload?.query
@@ -916,14 +1114,15 @@ export function App() {
     ? researchPayload?.request_id ?? searchPayload?.request_id
     : searchPayload?.request_id ?? researchPayload?.request_id;
   const activeWorkLabel = researchMutation.isPending
-    ? "Research synthesis is running"
+    ? llmReady ? "Research synthesis is running" : "Source review is running"
     : searchMutation.isPending
       ? "Search is running"
       : "Ready";
+  const activeElapsedSeconds = workStartedAt ? Math.max(0, Math.floor(((workClock || workStartedAt) - workStartedAt) / 1000)) : 0;
   const activeWorkDetail = researchMutation.isPending
-    ? `Gathering up to ${form.top_n} sources and waiting on the local model`
+    ? describeResearchProgress(form, llmReady, activeElapsedSeconds)
     : searchMutation.isPending
-      ? "Waiting on SearXNG and local cache"
+      ? describeSearchProgress(form, activeElapsedSeconds)
       : latestRequestId
         ? `Latest request ${shortId(latestRequestId)}`
         : "No active request";
@@ -933,6 +1132,9 @@ export function App() {
   };
 
   const runSearchRequest = () => {
+    const startedAt = Date.now();
+    setWorkStartedAt(startedAt);
+    setWorkClock(startedAt);
     searchMutation.mutate({
       query: form.query,
       engines: splitCsv(form.engines),
@@ -942,11 +1144,12 @@ export function App() {
       page: form.page,
       results_per_page: form.results_per_page,
       max_pages: form.max_pages,
+      target_result_count: form.target_results,
       safe_search: form.safe_search,
       dedupe: form.dedupe,
       fetch_pages: form.fetch_pages,
       extract_text: form.extract_text,
-      summarize: form.summarize,
+      summarize: llmReady && form.summarize,
       streaming: false,
       timeout_ms: form.timeout_ms,
       cache_policy: form.cache_policy
@@ -954,6 +1157,9 @@ export function App() {
   };
 
   const runResearchRequest = () => {
+    const startedAt = Date.now();
+    setWorkStartedAt(startedAt);
+    setWorkClock(startedAt);
     researchMutation.mutate({
       query: form.query,
       engines: splitCsv(form.engines),
@@ -963,6 +1169,7 @@ export function App() {
       page: form.page,
       results_per_page: form.results_per_page,
       max_pages: form.max_pages,
+      target_result_count: Math.max(form.target_results, form.top_n),
       safe_search: form.safe_search,
       top_n: form.top_n,
       timeout_ms: form.timeout_ms,
@@ -988,26 +1195,7 @@ export function App() {
 
   const loadPreset = (preset: SearchPreset) => {
     const request = preset.request as unknown as Record<string, unknown>;
-    setForm((current) => ({
-      ...current,
-      engines: Array.isArray(request.engines) ? request.engines.join(",") : "",
-      categories: Array.isArray(request.categories) ? request.categories.join(",") : "",
-      language: String(request.language ?? ""),
-      time_range: String(request.time_range ?? ""),
-      page: Number(request.page ?? 1),
-      results_per_page: Number(request.results_per_page ?? 10),
-      max_pages: Number(request.max_pages ?? 1),
-      safe_search: Number(request.safe_search ?? 1),
-      top_n: Number(request.top_n ?? current.top_n),
-      dedupe: Boolean(request.dedupe ?? true),
-      fetch_pages: Boolean(request.fetch_pages ?? false),
-      extract_text: Boolean(request.extract_text ?? false),
-      summarize: Boolean(request.summarize ?? false),
-      auto_name_session: Boolean(request.auto_name_session ?? true),
-      provider: String(request.provider ?? ""),
-      cache_policy: (request.cache_policy as SearchFormState["cache_policy"]) ?? "use",
-      timeout_ms: Number(request.timeout_ms ?? current.timeout_ms)
-    }));
+    setForm((current) => formFromPresetRequest(request, current));
   };
 
   const handleDeletePreset = (preset: SearchPreset) => {
@@ -1021,6 +1209,7 @@ export function App() {
     if (!preset) {
       setDefaultPresetId("");
       window.localStorage.removeItem(DEFAULT_PRESET_KEY);
+      window.localStorage.removeItem(DEFAULT_PRESET_FORM_KEY);
       recordActivity({
         kind: "ops",
         title: "Default preset cleared",
@@ -1031,6 +1220,7 @@ export function App() {
     }
     setDefaultPresetId(preset.preset_id);
     window.localStorage.setItem(DEFAULT_PRESET_KEY, preset.preset_id);
+    saveDefaultPresetForm(preset);
     recordActivity({
       kind: "ops",
       title: "Default preset selected",
@@ -1075,7 +1265,7 @@ export function App() {
     }
     setSessionId(snapshot.id);
     setSessionName(snapshot.name);
-    setForm({ ...INITIAL_FORM, ...snapshot.form });
+    setForm(normalizeStoredForm(snapshot.form));
     setWorkspaceTab(snapshot.workspaceTab);
     setActivityLog(snapshot.activityLog);
     setSearchPayload(snapshot.searchPayload ?? null);
@@ -1167,8 +1357,8 @@ export function App() {
         </div>
         <div className="hero__controls">
           <div className="signal-row">
-            <span className={`signal-pill ${defaultProvider?.healthy ? "signal-pill--ok" : "signal-pill--muted"}`}>
-              {describeProvider(defaultProvider)}
+            <span className={`signal-pill ${llmReady ? "signal-pill--ok" : "signal-pill--muted"}`}>
+              {llmStatusLabel}
             </span>
             <span className="signal-pill signal-pill--muted">
               {presetsQuery.data?.length ?? 0} presets saved
@@ -1188,7 +1378,7 @@ export function App() {
               Session Library
             </button>
             <button type="button" className="button" onClick={() => exportSession()}>
-              Export XML
+              Save Session
             </button>
             <button type="button" className="button" onClick={() => toggleUtilityPanel("log")}>
               Verbose log
@@ -1223,6 +1413,8 @@ export function App() {
             <SearchCommand
               value={form}
               busy={busy}
+              llmEnabled={llmEnabled}
+              llmReady={llmReady}
               onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
               onSearch={runSearchRequest}
               onResearch={runResearchRequest}
@@ -1264,6 +1456,8 @@ export function App() {
           providers={providersQuery.data ?? []}
           exportOptions={xmlExportOptions}
           expanded={searchSettingsExpanded}
+          llmEnabled={llmEnabled}
+          llmReady={llmReady}
           defaultPresetId={defaultPresetId}
           onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
           onExpandedChange={setSearchSettingsExpanded}
@@ -1297,10 +1491,12 @@ export function App() {
               pairingToken={pairingToken}
               lastMessage={adminMessage}
               readiness={readinessQuery.data}
+              llmSettings={llmSettingsQuery.data}
               history={historyQuery.data ?? []}
               onPairingTokenChange={handlePairingTokenChange}
-              onTestProvider={(name) => providerTestMutation.mutate(name)}
-              onVerifyProvider={(name) => providerVerifyMutation.mutate(name)}
+              onLlmSettingsChange={(settings) => llmSettingsMutation.mutate(settings)}
+              onTestProvider={(draft) => providerTestMutation.mutate(draft)}
+              onVerifyProvider={(draft) => providerVerifyMutation.mutate(draft)}
               onDiscoverModels={discoverProviderModels}
               onSetDefaultProvider={(name) => defaultProviderMutation.mutate(name)}
               onUpdateProvider={(name, profile) => providerUpdateMutation.mutate({ name, profile })}
@@ -1413,7 +1609,7 @@ function SessionLibrary({
         <input id="current-session-name" value={sessionName} onChange={(event) => onCurrentSessionNameChange(event.target.value)} />
       </div>
       <div className="session-library__actions">
-        <button type="button" className="button button--ghost" onClick={() => onExport(currentSessionId)}>Export Current as XML</button>
+        <button type="button" className="button button--ghost" onClick={() => onExport(currentSessionId)}>Save Current Session</button>
       </div>
       <div className="session-library__list">
         {sessionIndex.length === 0 ? <p className="muted">No saved sessions yet.</p> : null}
@@ -1426,7 +1622,7 @@ function SessionLibrary({
             <div className="session-library__row-actions">
               <button type="button" className="button button--ghost" onClick={() => onLoad(item.id)}>Load</button>
               <button type="button" className="button button--ghost" onClick={() => onRename(item.id)}>Rename</button>
-              <button type="button" className="button button--ghost" onClick={() => onExport(item.id)}>Export XML</button>
+              <button type="button" className="button button--ghost" onClick={() => onExport(item.id)}>Save Session</button>
               <button type="button" className="button button--ghost" onClick={() => onDelete(item.id)}>Delete</button>
             </div>
           </article>

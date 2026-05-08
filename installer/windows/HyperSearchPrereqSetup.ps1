@@ -184,6 +184,85 @@ function Find-PayloadFile {
     return $null
 }
 
+function Find-ChecksumFileForPath {
+    param([string]$Path)
+    foreach ($payloadRoot in Get-PayloadRoots) {
+        $mediaRoot = Split-Path -Parent $payloadRoot
+        $checksumPath = Join-Path $mediaRoot "checksums.sha256"
+        if ((Test-Path $checksumPath) -and $Path.StartsWith($mediaRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $checksumPath
+        }
+    }
+    return $null
+}
+
+function Test-MediaChecksum {
+    param([string]$Path)
+    $checksumPath = Find-ChecksumFileForPath -Path $Path
+    if (-not $checksumPath) {
+        return [ordered]@{ checked = $false; ok = $false; reason = "No checksums.sha256 found for media path." }
+    }
+    $mediaRoot = Split-Path -Parent $checksumPath
+    $relative = $Path.Substring($mediaRoot.Length).TrimStart("\", "/")
+    $expected = $null
+    foreach ($line in Get-Content -Path $checksumPath) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $parts = $line -split "\s+", 2
+        if ($parts.Count -eq 2 -and $parts[1].Trim() -eq $relative) {
+            $expected = $parts[0].Trim()
+            break
+        }
+    }
+    if (-not $expected) {
+        return [ordered]@{ checked = $true; ok = $false; reason = "No checksum entry for $relative."; checksumFile = $checksumPath }
+    }
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
+    [ordered]@{
+        checked = $true
+        ok = ($actual -eq $expected.ToLowerInvariant())
+        expected = $expected.ToLowerInvariant()
+        actual = $actual
+        checksumFile = $checksumPath
+        relativePath = $relative
+    }
+}
+
+function Assert-TrustedInstaller {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$Component,
+        [string]$ExpectedSignerPattern = "",
+        [switch]$RequireMediaChecksum
+    )
+    if (!(Test-Path $Path)) {
+        throw "$Component installer was not found: $Path"
+    }
+    $hash = (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
+    $signature = Get-AuthenticodeSignature -FilePath $Path
+    $verification = [ordered]@{
+        component = $Component
+        path = $Path
+        sha256 = $hash
+        signatureStatus = [string]$signature.Status
+        signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "" }
+        checksum = Test-MediaChecksum -Path $Path
+    }
+    if (-not $script:setupState.Contains("installerVerification")) {
+        $script:setupState["installerVerification"] = @()
+    }
+    $script:setupState["installerVerification"] = @($script:setupState["installerVerification"]) + $verification
+    if ($RequireMediaChecksum -and -not ([bool]$verification["checksum"]["ok"])) {
+        throw "$Component bundled installer checksum verification failed: $($verification["checksum"]["reason"])"
+    }
+    if ($signature.Status -ne "Valid") {
+        throw "$Component installer Authenticode signature is not valid. Status=$($signature.Status) Path=$Path"
+    }
+    if ($ExpectedSignerPattern -and $verification["signer"] -notmatch $ExpectedSignerPattern) {
+        throw "$Component installer signer did not match the expected publisher pattern. Signer=$($verification["signer"])"
+    }
+    Write-SetupLog "$Component installer verified. SHA256=$hash Signer=$($verification["signer"])"
+}
+
 function Write-SetupSummary {
     $script:setupState["completedAt"] = (Get-Date).ToString("o")
     try {
@@ -379,6 +458,7 @@ function Ensure-HyperSearchEnv {
             Set-Content -Path $rootEnv -Value @(
                 "HYPERSEARCH_ENV=production",
                 "HYPERSEARCH_LAN_ENABLED=false",
+                "HYPERSEARCH_LLM_ENABLED=true",
                 "HYPERSEARCH_PROVIDER_DEFAULT=lmstudio",
                 "HYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234",
                 "HYPERSEARCH_LMSTUDIO_MODEL=qwen2.5-7b-instruct",
@@ -403,7 +483,9 @@ function Ensure-HyperSearchEnv {
             "HYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234",
             "HYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0",
             "HYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0",
-            "HYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:latest"
+            "HYPERSEARCH_CADDY_IMAGE=caddy:2.11.2-alpine",
+            "HYPERSEARCH_VALKEY_IMAGE=valkey/valkey:8.1.6-alpine",
+            "HYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:2026.4.13-ee66b070a"
         ) -Encoding UTF8
         Write-SetupLog "Created Docker Compose .env from built-in defaults."
     } else {
@@ -413,8 +495,12 @@ function Ensure-HyperSearchEnv {
     Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_API_IMAGE" -Value "ghcr.io/nacsez/hypersearch-api:1.0.0"
     Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_UI_IMAGE" -Value "ghcr.io/nacsez/hypersearch-ui:1.0.0"
     Set-EnvValue -Path $rootEnv -Name "COMPOSE_PROJECT_NAME" -Value "hypersearch"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_ENV" -Value "production"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_API_IMAGE" -Value "ghcr.io/nacsez/hypersearch-api:1.0.0"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_UI_IMAGE" -Value "ghcr.io/nacsez/hypersearch-ui:1.0.0"
+    Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_CADDY_IMAGE" -Value "caddy:2.11.2-alpine"
+    Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_VALKEY_IMAGE" -Value "valkey/valkey:8.1.6-alpine"
+    Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_SEARXNG_IMAGE" -Value "searxng/searxng:2026.4.13-ee66b070a"
     New-Item -ItemType Directory -Force -Path (Join-Path $runtimeRoot "data\exports") | Out-Null
 }
 
@@ -426,6 +512,8 @@ function Configure-Model {
     $rootEnv = Join-Path $runtimeRoot ".env"
     $composeEnv = Join-Path $runtimeRoot "infra\docker\.env"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_PROVIDER_DEFAULT" -Value "lmstudio"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LLM_ENABLED" -Value "true"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_RESEARCH_CAPABILITY" -Value ""
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LMSTUDIO_BASE_URL" -Value "http://host.docker.internal:1234"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LMSTUDIO_MODEL" -Value $SelectedModel
     Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_LMSTUDIO_BASE_URL" -Value "http://host.docker.internal:1234"
@@ -449,6 +537,8 @@ function Configure-SearchOnly {
     $rootEnv = Join-Path $runtimeRoot ".env"
     $composeEnv = Join-Path $runtimeRoot "infra\docker\.env"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_PROVIDER_DEFAULT" -Value "lmstudio"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LLM_ENABLED" -Value "false"
+    Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_RESEARCH_CAPABILITY" -Value "search-only"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LMSTUDIO_BASE_URL" -Value "http://host.docker.internal:1234"
     Set-EnvValue -Path $rootEnv -Name "HYPERSEARCH_LMSTUDIO_MODEL" -Value ""
     Set-EnvValue -Path $composeEnv -Name "HYPERSEARCH_LMSTUDIO_BASE_URL" -Value "http://host.docker.internal:1234"
@@ -520,6 +610,13 @@ function Install-Docker {
         bytes = $installerSize
         bundled = [bool]$bundledInstaller
     }
+    $verifyArgs = @{
+        Path = $installer
+        Component = "Docker Desktop"
+        ExpectedSignerPattern = "Docker"
+    }
+    if ($bundledInstaller) { $verifyArgs["RequireMediaChecksum"] = $true }
+    Assert-TrustedInstaller @verifyArgs
     Write-SetupLog "Starting Docker Desktop installer."
     $dockerInstall = Start-Process -FilePath $installer -ArgumentList @("install", "--quiet", "--accept-license", "--backend=wsl-2", "--always-run-service") -Verb RunAs -Wait -PassThru
     $script:setupState["docker"]["installedBySetup"] = $true
@@ -616,6 +713,17 @@ function Get-BundledImageArchives {
     return @($archives | Sort-Object FullName -Unique)
 }
 
+function Get-BundledImageDigestManifests {
+    $manifests = @()
+    foreach ($root in Get-PayloadRoots) {
+        $imageDir = Join-Path $root "images"
+        if (Test-Path $imageDir) {
+            $manifests += Get-ChildItem -Path $imageDir -File -Filter "*.manifest.json" -Recurse
+        }
+    }
+    return @($manifests | Sort-Object FullName -Unique)
+}
+
 function Test-RegistryAccessError {
     param([string]$Value)
     if ([string]::IsNullOrWhiteSpace($Value)) {
@@ -649,10 +757,18 @@ function Set-LocalBuildImageProfile {
 
 function Initialize-DockerImages {
     $archives = @(Get-BundledImageArchives)
+    $digestManifests = @(Get-BundledImageDigestManifests)
     $script:setupState["imageSetup"] = [ordered]@{
         mode = if ($archives.Count -gt 0) { "bundled" } else { "online" }
         archiveCount = $archives.Count
         archives = @($archives | ForEach-Object { $_.FullName })
+        digestManifests = @($digestManifests | ForEach-Object {
+            try {
+                Get-Content -Raw -Path $_.FullName | ConvertFrom-Json
+            } catch {
+                [ordered]@{ path = $_.FullName; parseError = $_.Exception.Message }
+            }
+        })
         loaded = @()
         pulled = $false
         verified = $false
@@ -763,6 +879,11 @@ function Install-LmStudio {
         "prereqs\LM-Studio-Setup.exe"
     )
     if ($bundledInstaller) {
+        Assert-TrustedInstaller `
+            -Path $bundledInstaller `
+            -Component "LM Studio" `
+            -ExpectedSignerPattern "LM Studio|Element|Element Labs" `
+            -RequireMediaChecksum
         Write-SetupLog "Starting bundled LM Studio installer: $bundledInstaller"
         $lmInstall = Start-Process -FilePath $bundledInstaller -Wait -PassThru
         $script:setupState["lmStudio"]["installedBySetup"] = $true
@@ -915,7 +1036,10 @@ try {
     Initialize-DockerImages
     $lmStudioPath = Install-LmStudio
     $hardware = Get-HardwareProfile
-    if ($hardware.SearchOnlyRecommended) {
+    if (-not $lmStudioPath) {
+        Configure-SearchOnly -Reason "LM Studio was not installed or detected during setup"
+        Show-Info "HyperSearch Search-Only Setup" "HyperSearch search is ready. LLM features are disabled until you install LM Studio or configure another local OpenAI-compatible model provider in Operations."
+    } elseif ($hardware.SearchOnlyRecommended) {
         $reason = "RAM below ${searchOnlyMemoryThresholdGb}GB and no GPU with at least 6GB adapter RAM detected"
         Configure-SearchOnly -Reason $reason
         Show-Info "HyperSearch Search-Only Setup" "This computer has $($hardware.TotalMemoryGb)GB RAM and $($hardware.MaxVramGb)GB detected adapter RAM. HyperSearch search is ready, but research synthesis will stay disabled until you choose and validate a small local model in settings."

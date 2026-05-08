@@ -47,6 +47,16 @@ def build_lifespan():
 
         database = Database(settings.sqlite_path)
         database.initialize()
+        database.seed_app_setting(
+            "llm_enabled",
+            settings.llm_enabled,
+            source=settings.llm_settings_source,
+        )
+        database.seed_app_setting(
+            "llm_disabled_reason",
+            settings.llm_disabled_reason,
+            source=settings.llm_settings_source,
+        )
 
         metrics = MetricsRegistry()
         cache = CacheService(settings)

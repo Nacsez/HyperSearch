@@ -6,7 +6,7 @@ HyperSearch Desktop is the preferred local entry point for 1.0 testing on Window
 
 Run `Launch-HyperSearch.vbs` from the repository root for the quiet launcher path. It starts the compiled Tauri desktop app without opening a command prompt.
 
-The launcher uses the debug executable at `apps/desktop/src-tauri/target/debug/hypersearch-desktop.exe`. If the executable is missing, `Launch-HyperSearch.ps1` rebuilds the desktop frontend and native shell.
+The launcher prefers the release executable at `apps/desktop/src-tauri/target/release/hypersearch-desktop.exe` and falls back to the debug executable at `apps/desktop/src-tauri/target/debug/hypersearch-desktop.exe`. If neither executable exists, `Launch-HyperSearch.ps1` rebuilds the desktop frontend and native shell.
 
 ## Local Sessions
 
@@ -18,20 +18,22 @@ The default mode is local-only:
 
 The launcher has two main views:
 
-- **Deploy** starts/stops the Docker stack, checks prerequisites, shows service health, and exposes backend logs.
+- **Deploy** starts/stops the Docker stack, checks prerequisites, shows service health, exposes backend logs, and runs Docker doctor checks when engine access fails.
 - **Sessions** hosts embedded HyperSearch sessions as full-panel tabs.
 
 Use **New Session** to open HyperSearch as a managed tab inside the launcher. Multiple sessions can be opened in parallel for separate searches or research runs. Hidden sessions stay mounted so in-flight research requests can continue while you work in another session. Use **Browser** as a fallback if you want to inspect the same local page in your default browser.
 
-Each HyperSearch session keeps a local saved snapshot in browser storage. Open **Session Library** inside a session to rename, load, delete, or export saved sessions.
+Each HyperSearch session keeps a local saved snapshot in browser storage. Open **Session Library** inside a session to rename, load, delete, or save sessions.
 
-The in-session **Help** button opens the browser help page in normal browser mode. In the desktop launcher it opens a managed session titled **Help**, keeping support material inside the app shell.
+The in-session **Help** button opens the browser help page in normal browser mode. In the desktop launcher it opens a managed session titled **Help**, keeping support material inside the app shell. The Help page has its own zoom control and supports Ctrl+mouse-wheel zoom.
 
 ## Local Model Selection
 
 Open **Operations** in HyperSearch, edit the LM Studio provider endpoint, and save the profile. For Docker-managed HyperSearch, LM Studio on the host machine should usually be `http://host.docker.internal:1234`; a non-Docker local development API may use `http://127.0.0.1:1234`.
 
-After saving the endpoint, choose **Discover models**. HyperSearch queries the provider's OpenAI-compatible `/v1/models` endpoint, populates the preferred-model dropdown, and saves the selected model when you choose **Save profile**.
+Use the LLM toggle in **Operations** to switch between search-only mode and model-backed synthesis. Search-only is a valid state: searches and research source review continue to work while LLM features are off.
+
+Choose **Discover models** after typing an endpoint. HyperSearch queries the draft endpoint's OpenAI-compatible `/v1/models` endpoint without saving first. **Test** and **Verify model** also use the draft endpoint/model currently selected in the form. **Save profile** is the only action that persists provider settings.
 
 ## XML Exports
 
@@ -60,6 +62,7 @@ LAN mode is opt-in from the desktop app. When enabled:
 - Caddy binds to `0.0.0.0`.
 - The API requires `X-HyperSearch-Token` for private-network access.
 - Desktop-launched embedded sessions and browser sessions receive the token in the URL once, store it locally, and remove it from the address bar.
+- The desktop app puts `hypersearch_token` in the URL fragment so the token is not sent to Caddy or API request logs.
 - Browsers on another computer still need the displayed pairing token.
 
 Disabling LAN mode restores local-only binding and clears the saved pairing token in `.env`.
@@ -70,7 +73,7 @@ Closing the main desktop launcher prompts before shutdown. Confirming the prompt
 
 ## Diagnostics
 
-The launcher uses a runtime-local Docker config directory at `.docker` to avoid failures caused by unreadable user-level Docker config files. Docker and service output is visible from the **Logs** button in the launcher.
+The launcher uses a runtime-local Docker config directory at `.docker` to avoid failures caused by unreadable user-level Docker config files. Docker doctor reports local/user Docker config permissions, Docker context, named-pipe access, Docker Desktop service state, and `docker-users` group membership. Docker and service output is visible from the **Logs** button in the launcher.
 
 Backend actions are serialized: Start, Stop, Restart, and close-triggered shutdown cannot run over each other. Normal startup uses prebuilt images and does not pass `--build`.
 
@@ -83,13 +86,13 @@ Open **Settings > Export Diagnostics** to collect:
 - Docker version/info/image output
 - Compose config, ps, and recent service logs
 
-Diagnostics are written under `%LOCALAPPDATA%\HyperSearch\diagnostics`.
+Diagnostics are written under `%LOCALAPPDATA%\HyperSearch\diagnostics`. Token, key, password, auth, and credential values are redacted from exported env files, Compose output, command logs, copied desktop logs, and service logs.
 
 ## Release Candidate Installer
 
 The release-candidate installer supports two channels:
 
-- **Online media** pulls prebuilt images during setup.
-- **Full media** loads bundled Docker image archives from `payload\images`.
+- **Online media** pulls pinned prebuilt images during setup.
+- **Full media** loads bundled Docker image archives from `payload\images` and includes image digest manifests.
 
 Both channels write setup summaries and command logs under `%LOCALAPPDATA%\HyperSearch\logs`.

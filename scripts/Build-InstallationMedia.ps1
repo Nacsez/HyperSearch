@@ -54,6 +54,11 @@ if (-not $SkipTauriBuild) {
     }
 }
 
+$imageDigestManifestPath = ""
+if ($ImageArchivePath -and (Test-Path "$ImageArchivePath.manifest.json")) {
+    $imageDigestManifestPath = "$ImageArchivePath.manifest.json"
+}
+
 $releaseRoot = Join-Path $desktopRoot "src-tauri\target\release"
 $nsis = Join-Path $releaseRoot "bundle\nsis\HyperSearch_${Version}_x64-setup.exe"
 $msi = Join-Path $releaseRoot "bundle\msi\HyperSearch_${Version}_x64_en-US.msi"
@@ -100,6 +105,7 @@ function Copy-BaseArtifacts {
         diagnosticsPath = "%LOCALAPPDATA%\HyperSearch\diagnostics"
         imagePrimaryRegistry = $GhcrNamespace
         imageFallbackRegistry = $DockerHubNamespace
+        imageDigestManifest = if ($imageDigestManifestPath) { "payload\\images\\$(Split-Path -Leaf $imageDigestManifestPath)" } else { "" }
         notes = @(
             "Online media pulls prebuilt Docker images during setup.",
             "During private beta, online media falls back to a local API/UI image build if registry access is denied.",
@@ -125,6 +131,9 @@ function Copy-FullPayload {
             throw "Image archive was requested for full media but was not found: $ImageArchivePath"
         }
         Copy-Item -LiteralPath $ImageArchivePath -Destination (Join-Path $imagePayload (Split-Path -Leaf $ImageArchivePath)) -Force
+        if ($imageDigestManifestPath) {
+            Copy-Item -LiteralPath $imageDigestManifestPath -Destination (Join-Path $imagePayload (Split-Path -Leaf $imageDigestManifestPath)) -Force
+        }
     }
     if ($DockerDesktopInstallerPath) {
         if (!(Test-Path $DockerDesktopInstallerPath)) {
