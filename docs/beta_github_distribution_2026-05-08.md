@@ -15,29 +15,29 @@ This note records the current private beta handoff state. It is intended to make
 Generated folder:
 
 ```text
-Installation Media\ResearchReliabilityPolish_20260508
+Installation Media\WslUpdatePolish_20260508
 ```
 
 Upload-ready zip assets:
 
 | Asset | Size | SHA256 |
 | --- | ---: | --- |
-| `HyperSearch_1.0.0_Online_ResearchReliabilityPolish_20260508.zip` | 10,406,237 bytes | `30EF8E9E29E6915831D010D36C3A1A3A271A5081207208323F39CF49A78CD31C` |
-| `HyperSearch_1.0.0_Full_ResearchReliabilityPolish_20260508.zip` | 301,914,423 bytes | `37A1CD2C95E435141CE8FD8E8DC10FE6BD44EC354B04A0C1C00140CEAA850222` |
+| `HyperSearch_1.0.0_Online_WslUpdatePolish_20260508.zip` | 10,414,076 bytes | `9A82A1CE41F124FD4252A4B4A51680BEFCC0EC0EC3BA5072E9080537B66409A4` |
+| `HyperSearch_1.0.0_Full_WslUpdatePolish_20260508.zip` | 301,922,262 bytes | `E0B509667E6E86A2D21B6E6B167460C86B7349CEFCD5968ACA4932866E2FA890` |
 
 Important component hashes from the full media:
 
 | Component | SHA256 |
 | --- | --- |
-| `Full\HyperSearch_1.0.0_x64-setup.exe` | `B8DA56C3FBBDA03ACC765D2E7B4246C24A9455359DE5439E8D407BF2619E0635` |
+| `Full\HyperSearch_1.0.0_x64-setup.exe` | `6AD68F38389C2BDAB3215074D5B44AFA88B0ADD11F146AB4FF00014EC7DB3051` |
 | `Full\payload\images\hypersearch-images-1.0.0.tar` | `46EEF7016CD961DC89AB7E3443B480A57DD290F6573E1A4C2FFAF404ECAC518E` |
 
 ## Recommended GitHub Assets
 
 Upload these assets to a private GitHub release or pre-release:
 
-- `HyperSearch_1.0.0_Full_ResearchReliabilityPolish_20260508.zip`
-- `HyperSearch_1.0.0_Online_ResearchReliabilityPolish_20260508.zip`
+- `HyperSearch_1.0.0_Full_WslUpdatePolish_20260508.zip`
+- `HyperSearch_1.0.0_Online_WslUpdatePolish_20260508.zip`
 - Optionally, standalone installer files from `Online\` for connected users who do not need the full media package.
 
 Recommended tester guidance:
@@ -66,9 +66,13 @@ Expected prerequisites:
 - Docker Desktop for the backend runtime.
 - Optional LM Studio or another local OpenAI-compatible provider for LLM synthesis.
 
+Installer behavior:
+- Setup checks WSL status and runs `wsl --update` before Docker image setup.
+- If Windows requires elevation for the WSL update, setup requests elevation and records the result in `%LOCALAPPDATA%\HyperSearch\logs\setup-summary-*.json`.
+
 Checksums:
-- Full media zip: `37A1CD2C95E435141CE8FD8E8DC10FE6BD44EC354B04A0C1C00140CEAA850222`
-- Online media zip: `30EF8E9E29E6915831D010D36C3A1A3A271A5081207208323F39CF49A78CD31C`
+- Full media zip: `E0B509667E6E86A2D21B6E6B167460C86B7349CEFCD5968ACA4932866E2FA890`
+- Online media zip: `9A82A1CE41F124FD4252A4B4A51680BEFCC0EC0EC3BA5072E9080537B66409A4`
 ```
 
 ## Validation Recorded For This Candidate
@@ -77,9 +81,10 @@ Checksums:
 - UI build: passed.
 - Desktop frontend build: passed.
 - Desktop native `cargo check`: passed.
+- Installer PowerShell parse check: passed.
 - Production npm audits for UI and desktop: zero reported vulnerabilities.
 - Docker Compose release and development config validation: passed. This machine emitted the known `%USERPROFILE%\.docker\config.json` access warning during validation, which Docker doctor reports with remediation guidance.
 - Tauri release build, MSI, and NSIS installer generation: passed.
-- Docker image archive and both installer media channels: built successfully.
+- Docker image archive and both installer media channels: built successfully with WSL update setup included.
 - Release stack readiness: `/v1/ready` reported search ready and LLM ready with LM Studio loaded.
 - Research synthesis smoke: returned `llm-synthesis` with two requested and two retrieved sources.

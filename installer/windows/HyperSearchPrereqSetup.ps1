@@ -37,6 +37,7 @@ $script:setupState = [ordered]@{
     downloadModelOnly = [bool]$DownloadModelOnly
     runtimeCopy = [ordered]@{}
     docker = [ordered]@{}
+    wsl = [ordered]@{}
     lmStudio = [ordered]@{}
     hardware = $null
     imageSetup = [ordered]@{}
@@ -315,6 +316,140 @@ function Test-DockerInstalled {
         return $true
     }
     return (Test-Path "C:\Program Files\Docker\Docker\Docker Desktop.exe")
+}
+
+function Test-ProcessElevated {
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+        return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch {
+        Add-SetupWarning "Elevation detection failed: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Get-WslCommandPath {
+    $command = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if ($command -and $command.Source) {
+        return $command.Source
+    }
+    $candidates = @(
+        (Join-Path $env:SystemRoot "System32\wsl.exe"),
+        (Join-Path $env:SystemRoot "Sysnative\wsl.exe")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+    return ""
+}
+
+function Invoke-WslStatusSnapshot {
+    param(
+        [Parameter(Mandatory=$true)][string]$WslPath,
+        [Parameter(Mandatory=$true)][string]$Label
+    )
+    $result = Invoke-SetupCommand -FilePath $WslPath -Arguments @("--status") -Name "wsl-status-$Label"
+    return [ordered]@{
+        exitCode = $result.ExitCode
+        stdout = ($result.Stdout | Out-String).Trim()
+        stderr = ($result.Stderr | Out-String).Trim()
+        stdoutPath = $result.StdoutPath
+        stderrPath = $result.StderrPath
+    }
+}
+
+function Test-WslUpdateNeedsElevation {
+    param([string]$Output)
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return $false
+    }
+    return $Output -match "(?i)administrator|elevat|access is denied|0x80070005"
+}
+
+function Update-WslForDocker {
+    $script:setupState["wsl"] = [ordered]@{
+        available = $false
+        path = ""
+        updateAttempted = $false
+        updateExitCode = $null
+        elevatedAttempted = $false
+        elevatedExitCode = $null
+        statusBefore = $null
+        statusAfter = $null
+        skippedReason = ""
+        warning = ""
+    }
+    if (-not (Test-DockerInstalled)) {
+        $script:setupState["wsl"]["skippedReason"] = "Docker Desktop is not installed or was skipped."
+        Write-SetupLog "WSL update check skipped because Docker Desktop is not installed."
+        return
+    }
+    $wslPath = Get-WslCommandPath
+    if ([string]::IsNullOrWhiteSpace($wslPath)) {
+        $message = "wsl.exe was not found. Docker Desktop may need a Windows restart or WSL optional component enablement before its WSL backend can start."
+        $script:setupState["wsl"]["skippedReason"] = "wsl.exe not found"
+        $script:setupState["wsl"]["warning"] = $message
+        Add-SetupWarning $message
+        return
+    }
+    $script:setupState["wsl"]["available"] = $true
+    $script:setupState["wsl"]["path"] = $wslPath
+    Write-SetupLog "Checking WSL status before Docker readiness. Path=$wslPath"
+    try {
+        $script:setupState["wsl"]["statusBefore"] = Invoke-WslStatusSnapshot -WslPath $wslPath -Label "before"
+    } catch {
+        $script:setupState["wsl"]["statusBefore"] = [ordered]@{ error = $_.Exception.Message }
+        Write-SetupLog "WSL status before update failed: $($_.Exception.Message)" "WARN"
+    }
+    Write-SetupLog "Running WSL update check for Docker Desktop compatibility."
+    $script:setupState["wsl"]["updateAttempted"] = $true
+    try {
+        $update = Invoke-SetupCommand -FilePath $wslPath -Arguments @("--update") -Name "wsl-update"
+        $script:setupState["wsl"]["updateExitCode"] = $update.ExitCode
+        $script:setupState["wsl"]["updateStdoutPath"] = $update.StdoutPath
+        $script:setupState["wsl"]["updateStderrPath"] = $update.StderrPath
+        if ($update.ExitCode -ne 0) {
+            $combined = "$($update.Stdout)`n$($update.Stderr)"
+            if ((Test-WslUpdateNeedsElevation -Output $combined) -and -not (Test-ProcessElevated)) {
+                Write-SetupLog "WSL update requires elevation; requesting an elevated WSL update."
+                $script:setupState["wsl"]["elevatedAttempted"] = $true
+                try {
+                    $elevated = Start-Process -FilePath $wslPath -ArgumentList @("--update") -Verb RunAs -Wait -PassThru
+                    $script:setupState["wsl"]["elevatedExitCode"] = $elevated.ExitCode
+                    if ($elevated.ExitCode -eq 0) {
+                        Write-SetupLog "Elevated WSL update completed successfully."
+                    } else {
+                        $message = "Elevated WSL update exited with code $($elevated.ExitCode). Docker Desktop may ask to update WSL on first launch."
+                        $script:setupState["wsl"]["warning"] = $message
+                        Add-SetupWarning $message
+                    }
+                } catch {
+                    $message = "Elevated WSL update could not be completed: $($_.Exception.Message). If Docker Desktop reports a WSL update is required, open Windows Terminal as Administrator and run: wsl --update"
+                    $script:setupState["wsl"]["warning"] = $message
+                    Add-SetupWarning $message
+                }
+            } else {
+                $message = "WSL update exited with code $($update.ExitCode). Docker Desktop may ask to update WSL on first launch. See $($update.StderrPath)"
+                $script:setupState["wsl"]["warning"] = $message
+                Add-SetupWarning $message
+            }
+        } else {
+            Write-SetupLog "WSL update check completed successfully."
+        }
+    } catch {
+        $message = "WSL update check failed: $($_.Exception.Message)"
+        $script:setupState["wsl"]["warning"] = $message
+        Add-SetupWarning $message
+    }
+    try {
+        $script:setupState["wsl"]["statusAfter"] = Invoke-WslStatusSnapshot -WslPath $wslPath -Label "after"
+    } catch {
+        $script:setupState["wsl"]["statusAfter"] = [ordered]@{ error = $_.Exception.Message }
+        Write-SetupLog "WSL status after update failed: $($_.Exception.Message)" "WARN"
+    }
 }
 
 function Test-UsableGpu {
@@ -622,14 +757,9 @@ function Install-Docker {
     $script:setupState["docker"]["installedBySetup"] = $true
     $script:setupState["docker"]["installerExitCode"] = $dockerInstall.ExitCode
     Write-SetupLog "Docker Desktop installer exited with code $($dockerInstall.ExitCode)."
-    try {
-        Start-Process -FilePath "C:\Program Files\Docker\Docker\Docker Desktop.exe" -WindowStyle Hidden
-        $script:setupState["docker"]["launchAttempted"] = $true
-        Write-SetupLog "Docker Desktop launch requested after install."
-    } catch {
-        $script:setupState["docker"]["launchAttempted"] = $false
-        Add-SetupWarning "Docker Desktop launch after install failed: $($_.Exception.Message)"
-    }
+    $script:setupState["docker"]["launchAttempted"] = $false
+    $script:setupState["docker"]["launchDeferredUntilAfterWslUpdate"] = $true
+    Write-SetupLog "Docker Desktop launch deferred until after the WSL update check."
     try {
         $dockerVersion = (& docker --version 2>&1 | Out-String).Trim()
         $script:setupState["docker"]["versionAfterInstall"] = $dockerVersion
@@ -995,10 +1125,23 @@ function Show-SetupResult {
     }
     $profileMode = if ($script:setupState["profile"].Contains("mode")) { $script:setupState["profile"]["mode"] } else { "not configured" }
     $profileModel = if ($script:setupState["profile"].Contains("model")) { $script:setupState["profile"]["model"] } else { "" }
+    $wslStatus = "not checked"
+    if ($script:setupState.Contains("wsl") -and $script:setupState["wsl"].Contains("available")) {
+        if (-not [bool]$script:setupState["wsl"]["available"]) {
+            $wslStatus = "skipped - $($script:setupState["wsl"]["skippedReason"])"
+        } elseif ($script:setupState["wsl"]["warning"]) {
+            $wslStatus = "checked with warning - $($script:setupState["wsl"]["warning"])"
+        } elseif ($script:setupState["wsl"]["elevatedAttempted"]) {
+            $wslStatus = "updated with elevation"
+        } elseif ($script:setupState["wsl"]["updateAttempted"]) {
+            $wslStatus = "checked"
+        }
+    }
     $message = @(
         "HyperSearch setup finished.",
         "",
         "Docker engine ready: $dockerReady",
+        "WSL update: $wslStatus",
         "Image setup mode: $imageMode",
         "Image setup issues: $(if ($imageErrors.Count) { $imageErrors -join '; ' } else { 'none recorded' })",
         "LM Studio: $lmStatus",
@@ -1033,6 +1176,7 @@ try {
     Copy-RuntimePayload
     Ensure-HyperSearchEnv
     Install-Docker
+    Update-WslForDocker
     Initialize-DockerImages
     $lmStudioPath = Install-LmStudio
     $hardware = Get-HardwareProfile

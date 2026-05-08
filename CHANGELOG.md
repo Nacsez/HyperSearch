@@ -20,3 +20,4 @@
 - Improved long research handling with chunked synthesis, request-budget traces, clearer source metrics, and graceful fallback behavior.
 - Polished desktop/session UX for session saving, default search profiles, help zoom, Ctrl+wheel zoom, window-state restore, and narrow-window wrapping.
 - Added beta GitHub distribution notes with upload-ready media asset names and SHA256 checksums.
+- Added installer WSL status capture and `wsl --update` remediation before Docker image setup.

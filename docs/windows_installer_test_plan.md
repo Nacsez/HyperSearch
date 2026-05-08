@@ -10,6 +10,7 @@ This document tracks the first Windows 11 fresh-machine installer path for Hyper
 - Copy the bundled HyperSearch runtime stack into `%LOCALAPPDATA%\HyperSearch\runtime`.
 - Preserve existing user data, `.env`, Docker state, cache, exports, and logs on reinstall.
 - Check for Docker Desktop and offer to install it when missing.
+- Check Windows Subsystem for Linux status and run `wsl --update` before Docker image setup.
 - Check for LM Studio and offer to install it when missing.
 - Configure HyperSearch for LM Studio at `http://host.docker.internal:1234`.
 - Load bundled Docker image archives from full media when `payload\images` is present.
@@ -26,14 +27,15 @@ This document tracks the first Windows 11 fresh-machine installer path for Hyper
 1. Run the NSIS setup EXE from the generated `Installation Media` folder.
 2. Accept HyperSearch installation and choose desktop shortcut preference.
 3. If Docker Desktop is missing, accept Docker installation and approve Windows elevation.
-4. If LM Studio is missing, accept LM Studio installation.
-5. If prompted for model download, accept and verify installer can finish while download continues.
-6. Launch HyperSearch from Start Menu or desktop shortcut.
-7. Press Start and confirm Docker stack starts from `%LOCALAPPDATA%\HyperSearch\runtime`.
-8. Confirm `http://127.0.0.1:8090` opens from the desktop session and browser.
-9. Open settings and confirm LM Studio endpoint/model values are populated.
-10. If model download is complete and loaded in LM Studio, run research synthesis.
-11. Open desktop Settings and run **Export Diagnostics**.
+4. Confirm setup records WSL status and an attempted `wsl --update` in `setup-summary-*.json`.
+5. If LM Studio is missing, accept LM Studio installation.
+6. If prompted for model download, accept and verify installer can finish while download continues.
+7. Launch HyperSearch from Start Menu or desktop shortcut.
+8. Press Start and confirm Docker stack starts from `%LOCALAPPDATA%\HyperSearch\runtime`.
+9. Confirm `http://127.0.0.1:8090` opens from the desktop session and browser.
+10. Open settings and confirm LM Studio endpoint/model values are populated.
+11. If model download is complete and loaded in LM Studio, run research synthesis.
+12. Open desktop Settings and run **Export Diagnostics**.
 
 ## Logs
 
@@ -70,6 +72,7 @@ For a deployment issue report, collect all files under `%LOCALAPPDATA%\HyperSear
 ## Fresh-Machine QA Notes
 
 - Confirm the installer log records Docker detection, Docker installer download size, installer exit code, and the post-install Docker version when Docker is installed by setup.
+- Confirm the installer log and `setup-summary-*.json` record WSL command availability, status before/after, `wsl --update` command logs, and any elevated retry result.
 - Confirm the installer log records LM Studio detection, winget availability, LM Studio installer exit code, and the final detected LM Studio path.
 - Confirm `setup-summary-*.json` includes hardware RAM/GPU detection, selected install profile, runtime copy source/destination, and model-download status.
 - Confirm `setup-summary-*.json` records `imageSetup.mode` as `bundled` for full media, `online` for successful online pulls, or `local-build-fallback` when private registry access is denied and local source images are built.

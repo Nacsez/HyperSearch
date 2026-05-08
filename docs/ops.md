@@ -48,5 +48,6 @@
 - Release startup uses prebuilt images and does not build on the user machine.
 - Caddy, Valkey, and SearXNG release images are pinned to exact tags. Full media loads image archives with `docker load` and includes image digest manifests.
 - Online media runs `docker compose pull` and reports registry, DNS, proxy, or private-image failures before setup claims success.
+- Installer setup records WSL status before/after and runs `wsl --update` before Docker image setup. If Windows requires elevation, setup requests an elevated WSL update and records the result.
 - Docker readiness requires a clean server-version response, not just any Docker command output.
 - Docker doctor output includes local/user Docker config permission checks, Docker context, named-pipe access, Docker Desktop service state, and `docker-users` group membership remediation.

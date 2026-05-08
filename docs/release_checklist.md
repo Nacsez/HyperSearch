@@ -34,6 +34,7 @@
 - Online and full media are zipped for GitHub release assets; installer binaries and image archives are not committed to git.
 - Caddy, Valkey, and SearXNG images are pinned to exact tags or digests; no release path uses `latest`.
 - Docker Desktop missing/not-ready state is handled in installer and launcher.
+- Installer records WSL status and runs `wsl --update` before Docker image setup; elevated retry and manual-remediation messaging are covered.
 - Docker Desktop and bundled LM Studio installers pass Authenticode and media SHA256 checks before execution.
 - Search-only state, LM Studio missing-state, and `lms.exe` unavailable state are handled in installer and launcher.
 - Start, restart, stop, logs, and open-console actions work from the launcher.

@@ -39,7 +39,7 @@ docker compose --project-name hypersearch -f docker-compose.yml -f docker-compos
 - `apps/desktop` is the preferred 1.0 user entrypoint on Windows.
 - It manages Docker Compose lifecycle commands, shows status/logs, opens the console, and toggles paired LAN mode.
 - The launcher detects Docker Desktop and common LM Studio install paths, then requires all Compose services plus `/v1/live` and search readiness before sessions open.
-- Installer setup can guide Docker Desktop and LM Studio installation, load bundled image archives, pull online images, configure a local-model profile, or deliberately configure search-only mode.
+- Installer setup can guide Docker Desktop and LM Studio installation, check and update WSL for Docker Desktop's WSL backend, load bundled image archives, pull online images, configure a local-model profile, or deliberately configure search-only mode.
 - Desktop diagnostics can be exported from Settings for beta issue reports. Token, key, password, auth, and credential values are redacted from env files, compose output, command logs, and desktop logs.
 
 ## Installer Channels

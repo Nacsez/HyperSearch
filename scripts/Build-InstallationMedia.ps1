@@ -112,6 +112,7 @@ function Copy-BaseArtifacts {
             "Full media loads image archives from payload\\images when present.",
             "The NSIS setup runs the prerequisite helper and passes the installer media folder to it.",
             "Docker Desktop installation may require Windows administrator approval.",
+            "Setup checks WSL status and runs wsl --update before Docker image setup so Docker Desktop can start its WSL backend on freshly installed systems.",
             "LM Studio model download is asynchronous and may continue after installer completion.",
             "The desktop launcher writes full command logs under %LOCALAPPDATA%\\HyperSearch\\logs\\commands."
         )
