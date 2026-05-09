@@ -2,7 +2,8 @@
 name = "hypersearch-desktop"
 version = "1.0.0"
 description = "HyperSearch Windows launcher"
-authors = ["HyperSearch contributors"]
+authors = ["Robert Choudury"]
+license = "AGPL-3.0-only"
 edition = "2021"
 
 [build-dependencies]

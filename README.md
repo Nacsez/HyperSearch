@@ -96,7 +96,7 @@ The generated media supports:
 - installer and desktop command logs under `%LOCALAPPDATA%\HyperSearch\logs`
 - diagnostics export under `%LOCALAPPDATA%\HyperSearch\diagnostics` with token/key/password/auth values redacted
 
-For GitHub distribution, upload the generated media folders or zip archives as release assets rather than committing installer binaries to the repository. Use online media for small connected installs and full media for beta testers who should not depend on registry access during first launch. The current asset handoff workflow is documented in `docs/beta_github_distribution_2026-05-08.md`.
+For GitHub distribution, upload the generated media folders or zip archives as release assets rather than committing installer binaries to the repository. Use online media for small connected installs and full media for users who should not depend on registry access during first launch. The 1.0 asset handoff workflow is documented in `docs/github_release_distribution_1_0_2026-05-09.md`.
 
 ## In-App Help
 
@@ -139,6 +139,15 @@ For GitHub distribution, upload the generated media folders or zip archives as r
 - UI build: `cd apps/ui && npm run build`
 - Desktop frontend build: `cd apps/desktop && npm run build`
 - Desktop native check: `cd apps/desktop/src-tauri && cargo check`
+- License notice refresh/check: `.\scripts\Update-LicenseNotices.ps1` and `.\scripts\Update-LicenseNotices.ps1 -Check`
+
+## License
+
+HyperSearch-owned code is licensed as `AGPL-3.0-only`; see `LICENSE.md`
+and the full GNU AGPL text in `COPYING`. Third-party dependency and
+service-image posture is tracked in `THIRD_PARTY_NOTICES.md`, and public-release
+source expectations are tracked in `SOURCE_OFFER.md`. Release media builds
+refresh those notice files before packaging and include them at the media root.
 
 ## Status
 

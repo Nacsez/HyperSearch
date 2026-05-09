@@ -6,12 +6,12 @@ This guide is the durable reference for building and testing the private HyperSe
 
 HyperSearch now has two installer media channels:
 
-- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop setup, optionally guides LM Studio setup, and pulls pinned prebuilt Docker images during setup. During private beta, if the registry rejects the pull, setup falls back to building the HyperSearch API/UI images locally from the installed source payload and records that choice in the setup summary.
-- **Full media**: beta-testing package. It includes the installer plus `payload\images` Docker image archives and digest manifests so setup can run `docker load` instead of depending on Docker Hub or GHCR during first launch.
+- **Online media**: small GitHub-friendly installer. It installs HyperSearch, guides Docker Desktop setup, optionally guides LM Studio setup, and pulls pinned prebuilt Docker images during setup. If the registry pull is unavailable, setup falls back to building the HyperSearch API/UI images locally from the installed source payload and records that choice in the setup summary.
+- **Full media**: normal-user package. It includes the installer plus `payload\images` Docker image archives and digest manifests so setup can run `docker load` instead of depending on Docker Hub or GHCR during first launch.
 
-The private beta should use full media whenever possible. The online installer is still useful for connected developer systems and later public release testing.
+The 1.0 release should use full media whenever possible. The online installer is still useful for connected systems where public image pulls are expected to work.
 
-For GitHub distribution, do not commit generated binaries or image archives. Zip the generated `Online` and `Full` media folders and upload those zip files as release assets. See `docs/beta_github_distribution_2026-05-08.md` for the current private beta asset names, checksums, and release description template.
+For GitHub distribution, do not commit generated binaries or image archives. Zip the generated `Online` and `Full` media folders and upload those zip files as release assets. See `docs/github_release_distribution_1_0_2026-05-09.md` for the current 1.0 asset names, checksum placeholders, and release description template.
 
 ## Repository And Registries
 
@@ -30,7 +30,7 @@ docker.io/nacsez/hypersearch-api:1.0.0
 docker.io/nacsez/hypersearch-ui:1.0.0
 ```
 
-For private beta media, bundled image archives are preferred because private registry pulls require authentication. The local-build fallback keeps developer/tester machines unblocked, but full media remains the expected beta path because it avoids both private registry credentials and first-run source builds. Public release can switch online installs to unauthenticated public pulls after the images are made public.
+For public 1.0 media, bundled image archives are preferred for normal users because they avoid first-run registry and network problems. The local-build fallback keeps connected machines unblocked, but full media remains the expected public path because it avoids both registry credentials and first-run source builds.
 
 ## Build Commands
 

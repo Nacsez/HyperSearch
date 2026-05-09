@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Nacsez/HyperSearch/security
+    about: Use GitHub Security Advisories / private vulnerability reporting. Do not file public issues for unpatched vulnerabilities.
+  - name: Release downloads
+    url: https://github.com/Nacsez/HyperSearch/releases
+    about: Download installer media and verify release checksums from GitHub Releases.

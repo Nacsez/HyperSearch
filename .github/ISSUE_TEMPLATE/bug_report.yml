@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible HyperSearch problem.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include secrets, pairing tokens, `.env` contents, Docker credentials, private diagnostics bundles, or private machine information in a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: HyperSearch version
+      description: Include the app version or release asset name.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install_path
+    attributes:
+      label: Install path
+      options:
+        - Full media installer
+        - Online media installer
+        - Standalone installer
+        - Source checkout
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open HyperSearch
+        2. Start the stack
+        3. Run ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste only redacted snippets. Do not attach full diagnostics bundles publicly unless you have reviewed them.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed secrets, tokens, credentials, pairing tokens, and private `.env` values from this report.
+          required: true

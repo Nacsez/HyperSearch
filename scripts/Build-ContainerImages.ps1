@@ -8,7 +8,8 @@ param(
     [switch]$Push,
     [switch]$SaveArchive,
     [string]$ArchivePath = "",
-    [switch]$SkipThirdPartyPull
+    [switch]$SkipThirdPartyPull,
+    [switch]$SkipLicenseNoticeUpdate
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +19,14 @@ $apiContext = Join-Path $repoRoot "apps\api"
 $uiContext = Join-Path $repoRoot "apps\ui"
 $localApi = "hypersearch-api:$Version"
 $localUi = "hypersearch-ui:$Version"
+
+if (-not $SkipLicenseNoticeUpdate) {
+    try {
+        & (Join-Path $PSScriptRoot "Update-LicenseNotices.ps1")
+    } catch {
+        throw "License notice update failed: $($_.Exception.Message)"
+    }
+}
 
 $registryTags = @()
 if ($RegistryMode -in @("GHCR", "Both")) {

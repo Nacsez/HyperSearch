@@ -35,9 +35,15 @@ jobs:
       - name: Build browser UI
         working-directory: apps/ui
         run: npm ci && npm run build
+      - name: Audit browser UI production dependencies
+        working-directory: apps/ui
+        run: npm audit --omit=dev --audit-level=high
       - name: Build desktop frontend
         working-directory: apps/desktop
         run: npm ci && npm run build
+      - name: Audit desktop production dependencies
+        working-directory: apps/desktop
+        run: npm audit --omit=dev --audit-level=high
 
   desktop-native:
     name: Desktop native check
@@ -75,3 +81,31 @@ jobs:
         run: docker build -t hypersearch-api:ci apps/api
       - name: Build UI image
         run: docker build -t hypersearch-ui:ci apps/ui
+
+  release-security:
+    name: Release security metadata
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release security check
+        shell: pwsh
+        run: .\scripts\Test-ReleaseSecurity.ps1 -SkipNetworkAudits
+      - name: PowerShell release script parse check
+        shell: pwsh
+        run: |
+          $files = @(
+            "scripts/Update-LicenseNotices.ps1",
+            "scripts/Test-ReleaseSecurity.ps1",
+            "scripts/Sign-HyperSearchRelease.ps1",
+            "scripts/Build-InstallationMedia.ps1",
+            "scripts/Build-ContainerImages.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $errors | Format-List
+              exit 1
+            }
+          }

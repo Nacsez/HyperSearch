@@ -15,7 +15,7 @@ This document tracks the first Windows 11 fresh-machine installer path for Hyper
 - Configure HyperSearch for LM Studio at `http://host.docker.internal:1234`.
 - Load bundled Docker image archives from full media when `payload\images` is present.
 - Pull prebuilt images during online setup when no bundled archive is present.
-- Avoid building API/UI images on the tester machine during normal release startup. If online media cannot access the private registry during beta testing, setup and desktop startup may fall back to a local API/UI image build and record `imageSetup.mode=local-build-fallback`.
+- Avoid building API/UI images on the tester machine during normal release startup. If online media cannot access the registry, setup and desktop startup may fall back to a local API/UI image build and record `imageSetup.mode=local-build-fallback`.
 - Choose an initial model profile:
   - 16GB+ adapter RAM: offer/configure `openai/gpt-oss-20b`
   - adequate RAM or midrange GPU: offer/configure `qwen2.5-7b-instruct`

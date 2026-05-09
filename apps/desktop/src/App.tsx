@@ -768,7 +768,7 @@ function AppSettingsDrawer({
             <span>Support</span>
             <strong>Diagnostics</strong>
           </div>
-          <p className="settings-note">Export installer logs, launcher logs, Docker status, Compose status, and redacted settings for beta issue reports.</p>
+          <p className="settings-note">Export installer logs, launcher logs, Docker status, Compose status, and redacted settings for issue reports.</p>
           <button type="button" className="button settings-save" onClick={onExportDiagnostics}>Export Diagnostics</button>
         </section>
       </aside>

@@ -9,6 +9,7 @@ dist/
 build/
 *.egg-info/
 node_modules/
+.npm-cache/
 apps/ui/dist/
 apps/desktop/dist/
 apps/desktop/src-tauri/target/

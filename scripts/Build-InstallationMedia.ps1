@@ -11,7 +11,14 @@ param(
     [string]$LmStudioInstallerPath = "",
     [switch]$BuildImages,
     [switch]$PushImages,
-    [switch]$SkipTauriBuild
+    [switch]$SkipTauriBuild,
+    [switch]$SkipLicenseNoticeUpdate,
+    [ValidateSet("None", "Verify", "SelfSigned", "CertStore")]
+    [string]$SigningMode = "None",
+    [string]$SigningCertificateThumbprint = "",
+    [switch]$CreateSelfSignedSigningCertificate,
+    [switch]$TrustSelfSignedSigningCertificateForCurrentUser,
+    [switch]$SkipSigningTimestamp
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,20 +32,29 @@ $fullRoot = Join-Path $runRoot "Full"
 
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
 
+if (-not $SkipLicenseNoticeUpdate) {
+    try {
+        & (Join-Path $PSScriptRoot "Update-LicenseNotices.ps1")
+    } catch {
+        throw "License notice update failed: $($_.Exception.Message)"
+    }
+}
+
 if ($BuildImages) {
     $imageDir = Join-Path $runRoot "image-build"
     New-Item -ItemType Directory -Force -Path $imageDir | Out-Null
     $ImageArchivePath = Join-Path $imageDir "hypersearch-images-$Version.tar"
-    & (Join-Path $PSScriptRoot "Build-ContainerImages.ps1") `
-        -Version $Version `
-        -RegistryMode Both `
-        -GhcrNamespace $GhcrNamespace `
-        -DockerHubNamespace $DockerHubNamespace `
-        -SaveArchive `
-        -ArchivePath $ImageArchivePath `
-        -Push:$PushImages
-    if ($LASTEXITCODE -ne 0) {
-        throw "Container image build failed with exit code $LASTEXITCODE"
+    try {
+        & (Join-Path $PSScriptRoot "Build-ContainerImages.ps1") `
+            -Version $Version `
+            -RegistryMode Both `
+            -GhcrNamespace $GhcrNamespace `
+            -DockerHubNamespace $DockerHubNamespace `
+            -SaveArchive `
+            -ArchivePath $ImageArchivePath `
+            -Push:$PushImages
+    } catch {
+        throw "Container image build failed: $($_.Exception.Message)"
     }
 }
 
@@ -58,6 +74,7 @@ $imageDigestManifestPath = ""
 if ($ImageArchivePath -and (Test-Path "$ImageArchivePath.manifest.json")) {
     $imageDigestManifestPath = "$ImageArchivePath.manifest.json"
 }
+$signingSummaryPath = ""
 
 $releaseRoot = Join-Path $desktopRoot "src-tauri\target\release"
 $nsis = Join-Path $releaseRoot "bundle\nsis\HyperSearch_${Version}_x64-setup.exe"
@@ -77,6 +94,34 @@ foreach ($artifact in @($nsis, $msi, $exe)) {
     }
 }
 
+if ($SigningMode -ne "None") {
+    $signingSummaryPath = Join-Path $runRoot "signing-summary.json"
+    $signArgs = @(
+        "-Mode", $SigningMode,
+        "-Version", $Version,
+        "-PublisherName", "Robert Choudury",
+        "-AppName", "HyperSearch",
+        "-OutputPath", $signingSummaryPath
+    )
+    if ($SigningCertificateThumbprint) {
+        $signArgs += @("-CertificateThumbprint", $SigningCertificateThumbprint)
+    }
+    if ($CreateSelfSignedSigningCertificate) {
+        $signArgs += "-CreateSelfSignedCertificate"
+    }
+    if ($TrustSelfSignedSigningCertificateForCurrentUser) {
+        $signArgs += "-TrustSelfSignedCertificateForCurrentUser"
+    }
+    if ($SkipSigningTimestamp) {
+        $signArgs += "-SkipTimestamp"
+    }
+    try {
+        & (Join-Path $PSScriptRoot "Sign-HyperSearchRelease.ps1") @signArgs
+    } catch {
+        throw "Release signing step failed: $($_.Exception.Message)"
+    }
+}
+
 function Copy-BaseArtifacts {
     param(
         [Parameter(Mandatory=$true)][string]$Destination,
@@ -87,6 +132,13 @@ function Copy-BaseArtifacts {
     Copy-Item -LiteralPath $msi -Destination (Join-Path $Destination "HyperSearch_${Version}_x64_en-US.msi") -Force
     Copy-Item -LiteralPath $exe -Destination (Join-Path $Destination "hypersearch-desktop.exe") -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs\windows_installer_test_plan.md") -Destination (Join-Path $Destination "windows_installer_test_plan.md") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE.md") -Destination (Join-Path $Destination "LICENSE.md") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "COPYING") -Destination (Join-Path $Destination "COPYING") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $Destination "THIRD_PARTY_NOTICES.md") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "SOURCE_OFFER.md") -Destination (Join-Path $Destination "SOURCE_OFFER.md") -Force
+    if ($signingSummaryPath -and (Test-Path $signingSummaryPath)) {
+        Copy-Item -LiteralPath $signingSummaryPath -Destination (Join-Path $Destination "signing-summary.json") -Force
+    }
     $manifest = [ordered]@{
         product = "HyperSearch"
         version = $Version
@@ -106,10 +158,18 @@ function Copy-BaseArtifacts {
         imagePrimaryRegistry = $GhcrNamespace
         imageFallbackRegistry = $DockerHubNamespace
         imageDigestManifest = if ($imageDigestManifestPath) { "payload\\images\\$(Split-Path -Leaf $imageDigestManifestPath)" } else { "" }
+        license = "LICENSE.md"
+        licenseText = "COPYING"
+        thirdPartyNotices = "THIRD_PARTY_NOTICES.md"
+        sourceOffer = "SOURCE_OFFER.md"
+        signingMode = $SigningMode
+        signingSummary = if ($signingSummaryPath) { "signing-summary.json" } else { "" }
         notes = @(
             "Online media pulls prebuilt Docker images during setup.",
-            "During private beta, online media falls back to a local API/UI image build if registry access is denied.",
+            "Online media falls back to a local API/UI image build if registry access is unavailable.",
             "Full media loads image archives from payload\\images when present.",
+            "Release license, third-party notice, and source-offer files are included at the media root.",
+            "Signing metadata is included when the media build is run with a signing mode.",
             "The NSIS setup runs the prerequisite helper and passes the installer media folder to it.",
             "Docker Desktop installation may require Windows administrator approval.",
             "Setup checks WSL status and runs wsl --update before Docker image setup so Docker Desktop can start its WSL backend on freshly installed systems.",

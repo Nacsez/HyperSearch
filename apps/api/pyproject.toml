@@ -7,6 +7,8 @@ name = "hypersearch-api"
 version = "1.0.0"
 description = "Production-minded local/network search service"
 requires-python = ">=3.11"
+authors = [{ name = "Robert Choudury" }]
+license = { text = "AGPL-3.0-only" }
 dependencies = [
   "fastapi>=0.115,<1.0",
   "uvicorn[standard]>=0.32,<1.0",

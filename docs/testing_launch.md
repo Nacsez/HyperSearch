@@ -50,4 +50,4 @@ For release-mode startup, use:
 
 ## Release Candidate Media
 
-Use `.\scripts\Build-InstallationMedia.ps1 -Channel Both` to create online and full media folders. Use the full media folder for private beta machines when you want the installer to load bundled Docker images instead of pulling from a registry.
+Use `.\scripts\Build-InstallationMedia.ps1 -Channel Both` to create online and full media folders. Use the full media folder for normal release installs when you want the installer to load bundled Docker images instead of pulling from a registry.

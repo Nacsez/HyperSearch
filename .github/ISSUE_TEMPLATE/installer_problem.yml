@@ -1,0 +1,66 @@
+name: Installer or launch problem
+description: Report setup, Docker, WSL, or first-launch failures.
+title: "[Installer]: "
+labels: ["installer", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for clean install, WSL update, Docker Desktop, media loading, or launcher startup problems. Do not post secrets, tokens, diagnostics bundles, or local `.env` files publicly.
+  - type: input
+    id: asset
+    attributes:
+      label: Release asset used
+      placeholder: "HyperSearch_1.0.0_Full_....zip"
+    validations:
+      required: true
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: docker_state
+    attributes:
+      label: Docker Desktop state before install
+      options:
+        - Not installed
+        - Installed and working
+        - Installed but not working
+        - Unsure
+    validations:
+      required: true
+  - type: dropdown
+    id: wsl_state
+    attributes:
+      label: WSL state before install
+      options:
+        - Not installed
+        - Installed and current
+        - Installed but required update
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: What failed?
+      description: Include the visible error and the stage where it happened.
+    validations:
+      required: true
+  - type: textarea
+    id: redacted_logs
+    attributes:
+      label: Redacted log snippets
+      description: Useful files are under `%LOCALAPPDATA%\HyperSearch\logs`. Paste only reviewed/redacted snippets.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I reviewed the snippets and removed secrets, tokens, local credentials, pairing tokens, and private paths where needed.
+          required: true

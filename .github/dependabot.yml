@@ -1,0 +1,51 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/apps/ui"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ui"
+  - package-ecosystem: "npm"
+    directory: "/apps/desktop"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "desktop"
+  - package-ecosystem: "pip"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "api"
+  - package-ecosystem: "cargo"
+    directory: "/apps/desktop/src-tauri"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "desktop"
+  - package-ecosystem: "docker"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "container"
+  - package-ecosystem: "docker"
+    directory: "/apps/ui"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "container"
+  - package-ecosystem: "docker"
+    directory: "/infra/docker"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "container"
