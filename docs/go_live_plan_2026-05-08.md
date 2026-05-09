@@ -16,10 +16,10 @@ release-prep changes. The staged public release media is:
 
 ```text
 HyperSearch_1.0.0_Full_PublicRelease_20260509.zip
-SHA256 10f4a42e55a94d88bae0f2091a2eb39cf0cb2d12b1e7c8a6b45edbb511d675c1
+SHA256 ae4c2df17ccb3f4be00c3a6f72501c9fbe4b55147450a3dc6a7fdabb084856e9
 
 HyperSearch_1.0.0_Online_PublicRelease_20260509.zip
-SHA256 d44929b62f9bd4c9d83d6ef92723aa16845438c6c8b908392ae04d5a15505f2e
+SHA256 f656d0b0628b957472d39ad87430856b275929ce8c0f7e66b29776f0a3755a00
 ```
 
 ## Release Goal

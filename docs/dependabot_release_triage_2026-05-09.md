@@ -19,6 +19,8 @@ HyperSearch 1.0 public release.
 | UI Vite security | `dependabot/npm_and_yarn/apps/ui/vite-8.0.11`, `dependabot/npm_and_yarn/apps/ui/vitejs/plugin-react-6.0.1` | Updated `apps/ui` to `vite@8.0.11` and `@vitejs/plugin-react@6.0.1`. | Fixes npm audit findings for Vite path traversal and esbuild dev-server exposure. |
 | Desktop Vite security | `dependabot/npm_and_yarn/apps/desktop/vite-8.0.11`, `dependabot/npm_and_yarn/apps/desktop/vitejs/plugin-react-6.0.1` | Updated `apps/desktop` to `vite@8.0.11` and `@vitejs/plugin-react@6.0.1`. | Same Vite/esbuild audit findings existed in the desktop frontend workspace. |
 | Desktop Tauri security | `dependabot/cargo/apps/desktop/src-tauri/tauri-2.11.1`, `dependabot/cargo/apps/desktop/src-tauri/tauri-build-2.6.1`, `dependabot/npm_and_yarn/apps/desktop/tauri-apps/cli-2.11.1` | Updated Rust lockfile to `tauri@2.11.1` / `tauri-build@2.6.1`; updated npm CLI to `@tauri-apps/cli@2.11.1` and API package to the latest published `@tauri-apps/api@2.11.0`. | Tauri is security-sensitive desktop shell code. The update passed frontend build and `cargo check`. |
+| API runtime image | `dependabot/docker/apps/api/python-3.14-slim` | Updated API image base to `python:3.14-slim`. | Remaining GitHub alerts appeared to include Docker base images. Python 3.14 built successfully with current wheels. |
+| UI build image | `dependabot/docker/apps/ui/node-26-alpine` | Updated UI build stage to `node:26-alpine`. | Remaining GitHub alerts appeared to include Docker base images. The Vite 8 UI image build passed with Node 26. |
 | UI runtime image | `dependabot/docker/apps/ui/nginx-1.29-alpine` | Updated the UI Docker runtime stage from `nginx:1.27-alpine` to `nginx:1.29-alpine`. | Low-risk exact-tag source-build fallback image update. |
 
 ## Deferred Or Rejected For 1.0
@@ -31,8 +33,6 @@ HyperSearch 1.0 public release.
 | `dependabot/npm_and_yarn/apps/ui/typescript-6.0.3` | Defer | TypeScript 6 major tooling update. Not needed after Vite audit remediation. |
 | `dependabot/npm_and_yarn/apps/desktop/typescript-6.0.3` | Defer | Same TypeScript 6 major tooling risk. |
 | `dependabot/npm_and_yarn/apps/ui/types/node-25.6.2` | Defer | Type-only major update. Not needed for release security. |
-| `dependabot/docker/apps/ui/node-26-alpine` | Defer | Node 26 build-stage jump. Node 20 is stable for the current release build path. |
-| `dependabot/docker/apps/api/python-3.14-slim` | Defer | Python 3.14 runtime jump could affect binary wheels and local provider stack behavior. Python 3.11 remains the safer 1.0 base. |
 | `dependabot/cargo/apps/desktop/src-tauri/rand-0.10.1` | Defer | Major API change for token generation code; not tied to the active release security alerts. |
 | `dependabot/pip/apps/api/pytest-gte-8.3-and-lt-10.0` | Defer | Broadens dev dependency upper bound and makes future installs less predictable. Current tests pass. |
 | `dependabot/pip/apps/api/pytest-asyncio-gte-0.24-and-lt-2.0` | Defer | Broadens dev dependency upper bound. Current tests pass. |
@@ -66,10 +66,10 @@ HyperSearch 1.0 public release.
   related unmaintained/unsound advisories. Those are upstream Tauri dependency
   chain issues, not direct HyperSearch code or the Windows release target, and
   should be tracked after 1.0 while staying current with Tauri.
-- Rebuilt full media zip SHA256:
-  `10f4a42e55a94d88bae0f2091a2eb39cf0cb2d12b1e7c8a6b45edbb511d675c1`.
-- Rebuilt online media zip SHA256:
-  `d44929b62f9bd4c9d83d6ef92723aa16845438c6c8b908392ae04d5a15505f2e`.
+- Final rebuilt full media zip SHA256:
+  `ae4c2df17ccb3f4be00c3a6f72501c9fbe4b55147450a3dc6a7fdabb084856e9`.
+- Final rebuilt online media zip SHA256:
+  `f656d0b0628b957472d39ad87430856b275929ce8c0f7e66b29776f0a3755a00`.
 
 ## Remaining GitHub Cleanup
 
