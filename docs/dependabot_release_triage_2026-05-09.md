@@ -60,6 +60,12 @@ HyperSearch 1.0 public release.
   `hypersearch-ui:1.0.0`, Caddy, SearXNG, and Valkey started successfully;
   `/v1/ready` returned `status="ready"` with search ready and LLM unavailable
   as a safe optional-provider state.
+- `cargo-audit` 0.22.1 was installed under `C:\tmp\cargo-tools` and run
+  against `apps/desktop/src-tauri/Cargo.lock`; it exited successfully. It
+  reported allowed warnings for transitive Tauri/Linux GTK3 ecosystem crates and
+  related unmaintained/unsound advisories. Those are upstream Tauri dependency
+  chain issues, not direct HyperSearch code or the Windows release target, and
+  should be tracked after 1.0 while staying current with Tauri.
 - Rebuilt full media zip SHA256:
   `10f4a42e55a94d88bae0f2091a2eb39cf0cb2d12b1e7c8a6b45edbb511d675c1`.
 - Rebuilt online media zip SHA256:
