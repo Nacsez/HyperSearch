@@ -23,6 +23,7 @@ HyperSearch 1.0 public release.
 | UI build image | `dependabot/docker/apps/ui/node-26-alpine` | Updated UI build stage to `node:26-alpine`. | Remaining GitHub alerts appeared to include Docker base images. The Vite 8 UI image build passed with Node 26. |
 | UI runtime image | `dependabot/docker/apps/ui/nginx-1.29-alpine` | Updated the UI Docker runtime stage from `nginx:1.27-alpine` to `nginx:1.29-alpine`. | Low-risk exact-tag source-build fallback image update. |
 | API test/build tooling | `dependabot/pip/apps/api/pytest-gte-8.3-and-lt-10.0`, `dependabot/pip/apps/api/pytest-asyncio-gte-0.24-and-lt-2.0` | Raised `pytest` to `>=9.0.3,<10.0`, allowed `pytest-asyncio` 1.x, raised build-time `setuptools` to `>=78.1.1`, and removed dev/test extras from the production API image install. | A temporary `pip-audit` environment showed `pytest 8.4.2` vulnerable under the old `<9` cap. `setuptools>=78.1.1` avoids current setuptools advisories in build isolation. Dev tools should not ship in the runtime image. |
+| API runtime Python extras | `dependabot/pip/apps/api/redis-gte-5.2-and-lt-8.0`, `dependabot/pip/apps/api/trafilatura-gte-1.12-and-lt-3.0` | Raised Redis client to `>=7.4,<8.0` and Trafilatura to `>=2.0,<3.0`. | These are runtime extras and the remaining likely GitHub alerts after npm, Dockerfile, Tauri, pytest, and setuptools remediation. HyperSearch uses narrow stable surfaces for both libraries. |
 
 ## Deferred Or Rejected For 1.0
 
@@ -35,8 +36,6 @@ HyperSearch 1.0 public release.
 | `dependabot/npm_and_yarn/apps/desktop/typescript-6.0.3` | Defer | Same TypeScript 6 major tooling risk. |
 | `dependabot/npm_and_yarn/apps/ui/types/node-25.6.2` | Defer | Type-only major update. Not needed for release security. |
 | `dependabot/cargo/apps/desktop/src-tauri/rand-0.10.1` | Defer | Major API change for token generation code; not tied to the active release security alerts. |
-| `dependabot/pip/apps/api/redis-gte-5.2-and-lt-8.0` | Defer | Broadens runtime dependency upper bound across major Redis client versions; not required for a known current vulnerability. |
-| `dependabot/pip/apps/api/trafilatura-gte-1.12-and-lt-3.0` | Defer | Broadens extraction dependency upper bound across a major version; source extraction behavior is release-critical. |
 
 ## No-Op Branches
 
@@ -54,12 +53,13 @@ HyperSearch 1.0 public release.
 - `cargo check` in `apps/desktop/src-tauri`: passed with Tauri 2.11.1.
 - `pytest`: 19 passed, 1 skipped.
 - Temporary clean API audit environment: installed `hypersearch-api[all]` with
-  `pytest 9.0.3` and `pytest-asyncio 1.3.0`; `pip-audit` reported no known
-  vulnerabilities.
+  `redis 7.4.0`, `trafilatura 2.0.0`, `pytest 9.0.3`, and
+  `pytest-asyncio 1.3.0`; `pip-audit` reported no known vulnerabilities.
 - Release media rebuild: passed for `PublicRelease_20260509` after dependency
   remediation.
 - Production API image check: `pytest` is not installed in
-  `hypersearch-api:1.0.0`; `setuptools` resolves to `82.0.1`.
+  `hypersearch-api:1.0.0`; `redis` resolves to `7.4.0`, `trafilatura`
+  resolves to `2.0.0`, and `setuptools` resolves to `82.0.1`.
 - Rebuilt-image stack smoke: `hypersearch-api:1.0.0`,
   `hypersearch-ui:1.0.0`, Caddy, SearXNG, and Valkey started successfully;
   `/v1/ready` returned `status="ready"` with search ready and LLM unavailable
@@ -71,13 +71,13 @@ HyperSearch 1.0 public release.
   chain issues, not direct HyperSearch code or the Windows release target, and
   should be tracked after 1.0 while staying current with Tauri.
 - Final rebuilt full media zip SHA256:
-  `793b2017b0018f8f5b3e53d37cc3d07c203190cd1bd472fe25c076f0e749685c`.
+  `931a7ac1d3ec8a3bc9763302610b8e13640d969eb6de2f4cd841ac3b72d203b1`.
 - Final rebuilt online media zip SHA256:
-  `76b5308fcde685f8c2aa888a5bc51707d36c9b0037315bc6c0ecb8386e548887`.
+  `84724e60f9665bd0f74131c1eb839042b8f2ba7c34c8928170896a1173aa2c6b`.
 - Final rebuilt NSIS setup SHA256:
-  `7099237dba83c3a9fa949eb3a00ee1faf7d62bbd3c52bc71faa895502c9a734a`.
+  `71d6cd9a717c871acbe05c5d17c22c381b2a38ee23527aa168a0c705ff1879a1`.
 - Final rebuilt full-media image archive SHA256:
-  `a0dc23a28ea147bc9732532dca720a1517bd0f25c00937dcf8fbbcb0e3c9f8d2`.
+  `6f0459feb19f3961147604713870f49350fd70a58f7857a2f9427bd4027cc4ea`.
 
 ## Remaining GitHub Cleanup
 

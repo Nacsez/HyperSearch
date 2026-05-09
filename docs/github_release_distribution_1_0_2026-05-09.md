@@ -60,10 +60,10 @@ Upload these assets to the 1.0 GitHub release:
 
 Final staged hashes:
 
-- Full media zip: `793b2017b0018f8f5b3e53d37cc3d07c203190cd1bd472fe25c076f0e749685c`
-- Online media zip: `76b5308fcde685f8c2aa888a5bc51707d36c9b0037315bc6c0ecb8386e548887`
-- NSIS setup exe: `7099237dba83c3a9fa949eb3a00ee1faf7d62bbd3c52bc71faa895502c9a734a`
-- Full media image archive: `a0dc23a28ea147bc9732532dca720a1517bd0f25c00937dcf8fbbcb0e3c9f8d2`
+- Full media zip: `931a7ac1d3ec8a3bc9763302610b8e13640d969eb6de2f4cd841ac3b72d203b1`
+- Online media zip: `84724e60f9665bd0f74131c1eb839042b8f2ba7c34c8928170896a1173aa2c6b`
+- NSIS setup exe: `71d6cd9a717c871acbe05c5d17c22c381b2a38ee23527aa168a0c705ff1879a1`
+- Full media image archive: `6f0459feb19f3961147604713870f49350fd70a58f7857a2f9427bd4027cc4ea`
 
 Recommended user guidance:
 
