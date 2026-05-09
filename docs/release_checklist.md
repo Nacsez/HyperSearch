@@ -8,7 +8,7 @@
 - `cd apps/desktop/src-tauri && cargo check`
 - `cd infra/docker && docker compose --project-name hypersearch config --quiet`
 - `cd infra/docker && docker compose --project-name hypersearch -f docker-compose.yml -f docker-compose.dev.yml config --quiet`
-- `.\scripts\Build-ContainerImages.ps1 -Version 1.0.0 -RegistryMode Both -SaveArchive`
+- `.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260509 -Channel Both -Version 1.0.0 -RegistryMode GHCR -BuildImages -SigningMode Verify`
 - Release Docker stack startup on `127.0.0.1:8090` with API, UI/Caddy, SearXNG, and Valkey running.
 - Search smoke with no LM Studio.
 - Research fallback smoke with no LM Studio; expect `trace.mode="search-only-fallback"`.
@@ -53,7 +53,7 @@
 
 - README, API docs, deployment docs, operations docs, and in-app help match the shipped UI/API.
 - `docs/release_candidate_deployment.md` reflects the current 1.0 build workflow.
-- `docs/github_release_distribution_1_0_2026-05-09.md` records asset names, SHA256 hash placeholders, and GitHub release instructions.
+- `docs/github_release_distribution_1_0_2026-05-09.md` records asset names, SHA256 hashes, and GitHub release instructions.
 - In-app help includes online/full installer, local provider, XML export, diagnostics, CLI/API, and troubleshooting workflows.
 - Changelog has the release date and validation notes.
 - Security policy is present.

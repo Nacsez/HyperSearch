@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 840" role="img" aria-labelledby="title desc">
+  <title id="title">HyperSearch 1.0 release banner</title>
+  <desc id="desc">Marketing banner for HyperSearch, showing private local search, research, source review, and offline-ready installation media.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151917"/>
+      <stop offset="0.48" stop-color="#1e2924"/>
+      <stop offset="1" stop-color="#111516"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#81f2c2"/>
+      <stop offset="0.48" stop-color="#37d4e8"/>
+      <stop offset="1" stop-color="#ff894f"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#222a25"/>
+      <stop offset="1" stop-color="#151a18"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="840" fill="url(#background)"/>
+  <path d="M0 680 C260 600 444 742 672 642 C932 528 1092 394 1600 516 L1600 840 L0 840 Z" fill="#111516" opacity="0.8"/>
+  <path d="M-80 126 C222 64 438 172 642 126 C990 47 1210 42 1680 132" fill="none" stroke="#2a3932" stroke-width="2"/>
+  <path d="M-80 164 C222 102 438 210 642 164 C990 85 1210 80 1680 170" fill="none" stroke="#31463e" stroke-width="1.5" opacity="0.7"/>
+
+  <g transform="translate(96 92)">
+    <g transform="translate(0 10)">
+      <rect x="0" y="0" width="86" height="86" rx="18" fill="#111516" stroke="#3f4e47" stroke-width="3"/>
+      <path d="M23 21 L23 65 M63 21 L63 65 M18 43 L68 43" stroke="#f4efe4" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="43" cy="43" r="18" fill="none" stroke="#f4efe4" stroke-width="6"/>
+      <circle cx="43" cy="43" r="5" fill="#81f2c2"/>
+    </g>
+    <text x="112" y="45" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="36" font-weight="800" fill="#f6efe3">HyperSearch</text>
+    <text x="112" y="82" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="#9fb0a8">VERSION 1.0</text>
+  </g>
+
+  <g transform="translate(96 242)">
+    <text x="0" y="0" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="76" font-weight="900" fill="#fbf4e8">Private local search</text>
+    <text x="0" y="86" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="76" font-weight="900" fill="#fbf4e8">for serious research.</text>
+    <rect x="0" y="126" width="870" height="8" rx="4" fill="url(#accent)"/>
+    <text x="0" y="186" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#d9d2c7">
+      Run search-first workflows, source review, and optional local LLM synthesis
+    </text>
+    <text x="0" y="224" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#d9d2c7">
+      from packaged Windows installation media with Docker-powered services.
+    </text>
+
+    <g transform="translate(0 286)">
+      <rect x="0" y="0" width="244" height="58" rx="29" fill="#26302b" stroke="#506158" stroke-width="2"/>
+      <circle cx="32" cy="29" r="8" fill="#81f2c2"/>
+      <text x="54" y="37" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#fbf4e8">Search-only ready</text>
+    </g>
+    <g transform="translate(270 286)">
+      <rect x="0" y="0" width="282" height="58" rx="29" fill="#26302b" stroke="#506158" stroke-width="2"/>
+      <circle cx="32" cy="29" r="8" fill="#37d4e8"/>
+      <text x="54" y="37" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#fbf4e8">Local LLM optional</text>
+    </g>
+    <g transform="translate(578 286)">
+      <rect x="0" y="0" width="286" height="58" rx="29" fill="#26302b" stroke="#506158" stroke-width="2"/>
+      <circle cx="32" cy="29" r="8" fill="#ff894f"/>
+      <text x="54" y="37" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#fbf4e8">Packaged installer</text>
+    </g>
+  </g>
+
+  <g transform="translate(980 148)" filter="url(#shadow)">
+    <rect x="0" y="0" width="500" height="548" rx="28" fill="url(#panel)" stroke="#42514a" stroke-width="2"/>
+    <rect x="30" y="30" width="440" height="74" rx="18" fill="#303833" stroke="#53635a" stroke-width="2"/>
+    <circle cx="66" cy="67" r="8" fill="#81f2c2"/>
+    <text x="92" y="76" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="25" font-weight="850" fill="#fbf4e8">Research Session</text>
+
+    <g transform="translate(30 136)">
+      <rect x="0" y="0" width="440" height="88" rx="20" fill="#171d1a" stroke="#39443e" stroke-width="2"/>
+      <text x="24" y="32" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="900" letter-spacing="2" fill="#a9b5ae">QUESTION</text>
+      <text x="24" y="66" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="21" font-weight="800" fill="#f6efe3">What sources support this answer?</text>
+    </g>
+
+    <g transform="translate(30 252)">
+      <rect x="0" y="0" width="440" height="122" rx="22" fill="#171d1a" stroke="#39443e" stroke-width="2"/>
+      <text x="24" y="36" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="850" fill="#81f2c2">1. Search and collect sources</text>
+      <text x="24" y="71" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="850" fill="#37d4e8">2. Chunk long research jobs</text>
+      <text x="24" y="106" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="850" fill="#ff894f">3. Save session with citations</text>
+    </g>
+
+    <g transform="translate(30 404)">
+      <rect x="0" y="0" width="130" height="82" rx="18" fill="#222a25" stroke="#4b5e55" stroke-width="2"/>
+      <text x="20" y="32" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" font-weight="900" letter-spacing="2" fill="#a9b5ae">SOURCES</text>
+      <text x="20" y="64" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" font-weight="900" fill="#f6efe3">Ready</text>
+    </g>
+    <g transform="translate(154 404)">
+      <rect x="0" y="0" width="146" height="82" rx="18" fill="#222a25" stroke="#4b5e55" stroke-width="2"/>
+      <text x="20" y="32" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" font-weight="900" letter-spacing="2" fill="#a9b5ae">MODE</text>
+      <text x="20" y="64" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" font-weight="900" fill="#f6efe3">Local</text>
+    </g>
+    <g transform="translate(316 404)">
+      <rect x="0" y="0" width="154" height="82" rx="18" fill="#222a25" stroke="#4b5e55" stroke-width="2"/>
+      <text x="20" y="32" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" font-weight="900" letter-spacing="2" fill="#a9b5ae">EXPORT</text>
+      <text x="20" y="64" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" font-weight="900" fill="#f6efe3">XML</text>
+    </g>
+  </g>
+
+  <g transform="translate(96 744)">
+    <text x="0" y="0" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#aebbb4">Windows desktop app | Docker service stack | AGPL-3.0-only | SHA256-verifiable unsigned release</text>
+  </g>
+</svg>

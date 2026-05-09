@@ -4,6 +4,8 @@ param(
     [ValidateSet("Online", "Full", "Both")]
     [string]$Channel = "Both",
     [string]$Version = "1.0.0",
+    [ValidateSet("GHCR", "DockerHub", "Both")]
+    [string]$RegistryMode = "GHCR",
     [string]$GhcrNamespace = "ghcr.io/nacsez",
     [string]$DockerHubNamespace = "docker.io/nacsez",
     [string]$ImageArchivePath = "",
@@ -47,7 +49,7 @@ if ($BuildImages) {
     try {
         & (Join-Path $PSScriptRoot "Build-ContainerImages.ps1") `
             -Version $Version `
-            -RegistryMode Both `
+            -RegistryMode $RegistryMode `
             -GhcrNamespace $GhcrNamespace `
             -DockerHubNamespace $DockerHubNamespace `
             -SaveArchive `
@@ -96,24 +98,24 @@ foreach ($artifact in @($nsis, $msi, $exe)) {
 
 if ($SigningMode -ne "None") {
     $signingSummaryPath = Join-Path $runRoot "signing-summary.json"
-    $signArgs = @(
-        "-Mode", $SigningMode,
-        "-Version", $Version,
-        "-PublisherName", "Robert Choudury",
-        "-AppName", "HyperSearch",
-        "-OutputPath", $signingSummaryPath
-    )
+    $signArgs = @{
+        Mode = $SigningMode
+        Version = $Version
+        PublisherName = "Robert Choudury"
+        AppName = "HyperSearch"
+        OutputPath = $signingSummaryPath
+    }
     if ($SigningCertificateThumbprint) {
-        $signArgs += @("-CertificateThumbprint", $SigningCertificateThumbprint)
+        $signArgs.CertificateThumbprint = $SigningCertificateThumbprint
     }
     if ($CreateSelfSignedSigningCertificate) {
-        $signArgs += "-CreateSelfSignedCertificate"
+        $signArgs.CreateSelfSignedCertificate = $true
     }
     if ($TrustSelfSignedSigningCertificateForCurrentUser) {
-        $signArgs += "-TrustSelfSignedCertificateForCurrentUser"
+        $signArgs.TrustSelfSignedCertificateForCurrentUser = $true
     }
     if ($SkipSigningTimestamp) {
-        $signArgs += "-SkipTimestamp"
+        $signArgs.SkipTimestamp = $true
     }
     try {
         & (Join-Path $PSScriptRoot "Sign-HyperSearchRelease.ps1") @signArgs
@@ -139,6 +141,16 @@ function Copy-BaseArtifacts {
     if ($signingSummaryPath -and (Test-Path $signingSummaryPath)) {
         Copy-Item -LiteralPath $signingSummaryPath -Destination (Join-Path $Destination "signing-summary.json") -Force
     }
+    $digestManifestMediaPath = ""
+    if ($imageDigestManifestPath -and (Test-Path $imageDigestManifestPath)) {
+        $digestManifestLeaf = Split-Path -Leaf $imageDigestManifestPath
+        if ($MediaChannel -eq "Full") {
+            $digestManifestMediaPath = "payload\\images\\$digestManifestLeaf"
+        } else {
+            Copy-Item -LiteralPath $imageDigestManifestPath -Destination (Join-Path $Destination $digestManifestLeaf) -Force
+            $digestManifestMediaPath = $digestManifestLeaf
+        }
+    }
     $manifest = [ordered]@{
         product = "HyperSearch"
         version = $Version
@@ -156,8 +168,9 @@ function Copy-BaseArtifacts {
         commandLogPath = "%LOCALAPPDATA%\HyperSearch\logs\commands"
         diagnosticsPath = "%LOCALAPPDATA%\HyperSearch\diagnostics"
         imagePrimaryRegistry = $GhcrNamespace
-        imageFallbackRegistry = $DockerHubNamespace
-        imageDigestManifest = if ($imageDigestManifestPath) { "payload\\images\\$(Split-Path -Leaf $imageDigestManifestPath)" } else { "" }
+        imageFallbackRegistry = if ($RegistryMode -in @("DockerHub", "Both")) { $DockerHubNamespace } else { "" }
+        registryMode = $RegistryMode
+        imageDigestManifest = $digestManifestMediaPath
         license = "LICENSE.md"
         licenseText = "COPYING"
         thirdPartyNotices = "THIRD_PARTY_NOTICES.md"
@@ -172,6 +185,7 @@ function Copy-BaseArtifacts {
             "Signing metadata is included when the media build is run with a signing mode.",
             "The NSIS setup runs the prerequisite helper and passes the installer media folder to it.",
             "Docker Desktop installation may require Windows administrator approval.",
+            "Docker Desktop and LM Studio downloads require internet access unless their installers are supplied in payload\\prereqs.",
             "Setup checks WSL status and runs wsl --update before Docker image setup so Docker Desktop can start its WSL backend on freshly installed systems.",
             "LM Studio model download is asynchronous and may continue after installer completion.",
             "The desktop launcher writes full command logs under %LOCALAPPDATA%\\HyperSearch\\logs\\commands."
@@ -245,8 +259,9 @@ $summary = [ordered]@{
     onlineRoot = if (Test-Path $onlineRoot) { $onlineRoot } else { "" }
     fullRoot = if (Test-Path $fullRoot) { $fullRoot } else { "" }
     imageArchivePath = $ImageArchivePath
+    registryMode = $RegistryMode
     ghcrNamespace = $GhcrNamespace
-    dockerHubNamespace = $DockerHubNamespace
+    dockerHubNamespace = if ($RegistryMode -in @("DockerHub", "Both")) { $DockerHubNamespace } else { "" }
 }
 
 ($summary | ConvertTo-Json -Depth 6) | Set-Content -Path (Join-Path $runRoot "media-summary.json") -Encoding UTF8

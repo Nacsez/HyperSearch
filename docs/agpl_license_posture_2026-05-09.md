@@ -56,7 +56,7 @@ docs/go_live_plan_2026-05-08.md
 Current release media:
 
 ```text
-Installation Media\PublicRelease_YYYYMMDD
+Installation Media\PublicRelease_20260509
 ```
 
 The Tauri bundle includes `LICENSE.md`, `README.md`, `SECURITY.md`, `CHANGELOG.md`, `docs`, `infra`, `apps/api`, `apps/ui`, and installer scripts as resources. That is good for source availability. Release validation should run `scripts/Update-LicenseNotices.ps1 -Check` so bundled notices do not drift from dependency and image changes.

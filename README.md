@@ -13,6 +13,31 @@ HyperSearch is a local-control search and research service for people who want t
 - Smoke/benchmark scripts and a Linux install helper
 - Unit, integration, and live-smoke test scaffolding
 
+## Install HyperSearch 1.0
+
+The recommended public install path is the **Full Installation Media** ZIP from
+GitHub Releases:
+
+1. Download `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`.
+2. Verify the published SHA256 checksum before running the installer.
+3. Extract the ZIP to a writable folder.
+4. Run `HyperSearch_1.0.0_x64-setup.exe`.
+5. Follow the installer prompts for Docker Desktop, WSL update handling, and optional LM Studio setup.
+
+Full media includes the HyperSearch installer and bundled Docker image archive.
+Docker Desktop and LM Studio are third-party tools and may still require internet
+access when they need to be installed or updated. Search-only mode is a supported
+success state; LM Studio is optional.
+
+The Online media ZIP is smaller and uses the public GHCR images:
+
+- `ghcr.io/nacsez/hypersearch-api:1.0.0`
+- `ghcr.io/nacsez/hypersearch-ui:1.0.0`
+
+Use Online media when the target computer has reliable internet and registry
+access. Use Full media for normal end users, clean machines, and offline-prone
+systems.
+
 ## 1.0 Local-Control Position
 
 - No external/cloud model API keys are supported for 1.0.
@@ -82,11 +107,10 @@ docker compose --project-name hypersearch -f docker-compose.yml -f docker-compos
 
 The deploy helper wraps the Docker Compose stack in `infra/docker`, uses an isolated repo-local Docker config, and defaults to release-mode `up -d`. Use `-Build` only when you intentionally want the local development override. The `doctor` action reports Docker config ACLs, context, named-pipe access, Docker Desktop service state, and `docker-users` group membership.
 
-### Release Candidate Media
+### Release Media
 
 ```powershell
-.\scripts\Build-ContainerImages.ps1 -Version 1.0.0 -RegistryMode Both -SaveArchive
-.\scripts\Build-InstallationMedia.ps1 -RunName RC1 -Channel Both -Version 1.0.0 -ImageArchivePath .\artifacts\images\hypersearch-images-1.0.0.tar
+.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260509 -Channel Both -Version 1.0.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
 ```
 
 The generated media supports:
@@ -96,7 +120,12 @@ The generated media supports:
 - installer and desktop command logs under `%LOCALAPPDATA%\HyperSearch\logs`
 - diagnostics export under `%LOCALAPPDATA%\HyperSearch\diagnostics` with token/key/password/auth values redacted
 
-For GitHub distribution, upload the generated media folders or zip archives as release assets rather than committing installer binaries to the repository. Use online media for small connected installs and full media for users who should not depend on registry access during first launch. The 1.0 asset handoff workflow is documented in `docs/github_release_distribution_1_0_2026-05-09.md`.
+For GitHub distribution, upload the generated media ZIP archives as release
+assets rather than committing installer binaries to the repository. Use online
+media for small connected installs and full media for users who should not
+depend on registry access during first launch. The 1.0 asset handoff workflow is
+documented in `docs/github_release_distribution_1_0_2026-05-09.md`, and the
+staged release body is in `docs/releases/hypersearch-1.0-github-release.md`.
 
 ## In-App Help
 
@@ -151,4 +180,7 @@ refresh those notice files before packaging and include them at the media root.
 
 ## Status
 
-This repository now contains the core 1.0 local-control implementation surfaces. Runtime verification still depends on Docker Desktop, SearXNG, Valkey, and a local model provider being available on the target machine.
+This repository is staged for the HyperSearch 1.0 public release. Runtime use
+requires Docker Desktop for the local service stack. Local LLM synthesis requires
+an enabled local provider, but search, source review, diagnostics, and session
+saving remain available without one.

@@ -2,7 +2,7 @@
 param(
     [string]$Version = "1.0.0",
     [ValidateSet("GHCR", "DockerHub", "Both")]
-    [string]$RegistryMode = "Both",
+    [string]$RegistryMode = "GHCR",
     [string]$GhcrNamespace = "ghcr.io/nacsez",
     [string]$DockerHubNamespace = "docker.io/nacsez",
     [switch]$Push,
@@ -19,6 +19,7 @@ $apiContext = Join-Path $repoRoot "apps\api"
 $uiContext = Join-Path $repoRoot "apps\ui"
 $localApi = "hypersearch-api:$Version"
 $localUi = "hypersearch-ui:$Version"
+$sourceUrl = "https://github.com/Nacsez/HyperSearch"
 
 if (-not $SkipLicenseNoticeUpdate) {
     try {
@@ -78,10 +79,26 @@ function Get-ImageDigestRecord {
 }
 
 Write-Host "Building HyperSearch API image $localApi" -ForegroundColor Cyan
-Invoke-Docker -DockerArgs @("build", "-t", $localApi, $apiContext)
+Invoke-Docker -DockerArgs @(
+    "build",
+    "--label", "org.opencontainers.image.title=HyperSearch API",
+    "--label", "org.opencontainers.image.version=$Version",
+    "--label", "org.opencontainers.image.source=$sourceUrl",
+    "--label", "org.opencontainers.image.licenses=AGPL-3.0-only",
+    "-t", $localApi,
+    $apiContext
+)
 
 Write-Host "Building HyperSearch UI image $localUi" -ForegroundColor Cyan
-Invoke-Docker -DockerArgs @("build", "-t", $localUi, $uiContext)
+Invoke-Docker -DockerArgs @(
+    "build",
+    "--label", "org.opencontainers.image.title=HyperSearch UI",
+    "--label", "org.opencontainers.image.version=$Version",
+    "--label", "org.opencontainers.image.source=$sourceUrl",
+    "--label", "org.opencontainers.image.licenses=AGPL-3.0-only",
+    "-t", $localUi,
+    $uiContext
+)
 
 foreach ($tagSet in $registryTags) {
     Invoke-Docker -DockerArgs @("tag", $localApi, $tagSet.Api)

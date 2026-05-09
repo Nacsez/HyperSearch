@@ -28,33 +28,42 @@ Do not ask public users to install a self-signed root certificate. Self-signed s
 
 ## Final Media Build
 
-Build final media from the exact release commit after validation passes:
+Build final media from the exact release commit after validation passes. The
+current staged media was generated with:
 
 ```powershell
 .\scripts\Build-InstallationMedia.ps1 `
-  -RunName PublicRelease_YYYYMMDD `
+  -RunName PublicRelease_20260509 `
   -Channel Both `
   -Version 1.0.0 `
-  -ImageArchivePath .\artifacts\images\hypersearch-images-1.0.0.tar `
+  -RegistryMode GHCR `
+  -BuildImages `
   -SigningMode Verify
 ```
 
 Then zip the generated `Online` and `Full` folders and compute SHA256 hashes:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\HyperSearch_1.0.0_Full_PublicRelease_YYYYMMDD.zip
-Get-FileHash -Algorithm SHA256 .\HyperSearch_1.0.0_Online_PublicRelease_YYYYMMDD.zip
+Get-FileHash -Algorithm SHA256 .\HyperSearch_1.0.0_Full_PublicRelease_20260509.zip
+Get-FileHash -Algorithm SHA256 .\HyperSearch_1.0.0_Online_PublicRelease_20260509.zip
 ```
 
 ## Recommended GitHub Assets
 
 Upload these assets to the 1.0 GitHub release:
 
-- `HyperSearch_1.0.0_Full_PublicRelease_YYYYMMDD.zip`
-- `HyperSearch_1.0.0_Online_PublicRelease_YYYYMMDD.zip`
+- `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`
+- `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip`
 - Optional standalone `HyperSearch_1.0.0_x64-setup.exe`
 - Optional standalone `HyperSearch_1.0.0_x64_en-US.msi`
 - Optional top-level `checksums.sha256`
+
+Final staged hashes:
+
+- Full media zip: `0fa8a0ef2a83f04802150f0f9dbb935aca94c55cc2f94abaaae4083ab7229590`
+- Online media zip: `77ec1b22904306c1360322c0688655ae2ee61c01cdb8982f5b3e1c21daaedcfb`
+- NSIS setup exe: `5d34801cd53d3eedd1ed3f75945ccb2f6f8b2568ab71e9023e40248e647fcd5a`
+- Full media image archive: `786ed92233e839c3c8665a3497fb01f563e484490a5abc5e8afff321b2e75b86`
 
 Recommended user guidance:
 
@@ -62,55 +71,41 @@ Recommended user guidance:
 - Use **Online** media for connected machines where pulling public Docker images is acceptable.
 - Use the repository source path only for developers who intentionally want to run `scripts\Deploy-HyperSearch.cmd` or local builds.
 
+## Container Image Publication
+
+Before promoting the Online media path, publish the 1.0 images to GHCR and mark
+the packages public:
+
+1. Push this release-prep commit to `main`.
+2. Run the GitHub Actions workflow **Publish Container Images** with
+   `version=1.0.0` and `publish_dockerhub=false`.
+3. Confirm these unauthenticated pulls work from a clean machine:
+   - `docker pull ghcr.io/nacsez/hypersearch-api:1.0.0`
+   - `docker pull ghcr.io/nacsez/hypersearch-ui:1.0.0`
+
+Local `docker push` from this workstation was denied by GHCR authentication, so
+the GitHub Actions path is the expected no-token publication path.
+
 ## Release Description Template
 
-```markdown
-HyperSearch 1.0 is a local-control search and research launcher for Windows. It runs a local Docker-backed search stack, supports search-only use by default, and can optionally use LM Studio or another local OpenAI-compatible provider for local-model research synthesis.
-
-Recommended install:
-- Download the Full media zip.
-- Verify the SHA256 checksum published below.
-- Extract it to a writable folder.
-- Run `HyperSearch_1.0.0_x64-setup.exe`.
-- Launch HyperSearch from the installed shortcut.
-
-Use the Online media only when the machine has reliable internet access and can pull the required Docker images.
-
-Search-only mode is supported. LM Studio is optional; when no local model is connected, HyperSearch still supports search, source review, session saving, diagnostics export, and later model setup from Operations.
-
-Expected prerequisites:
-- Windows 10/11.
-- Docker Desktop for the backend runtime.
-- Optional LM Studio or another local OpenAI-compatible provider for LLM synthesis.
-
-Installer behavior:
-- Setup checks WSL status and runs `wsl --update` before Docker image setup.
-- If Windows requires elevation for the WSL update, setup requests elevation and records the result in `%LOCALAPPDATA%\HyperSearch\logs\setup-summary-*.json`.
-
-Windows security prompt:
-- This release uses the no-cost unsigned distribution path.
-- Windows SmartScreen may warn that the app is unrecognized.
-- Verify the SHA256 checksums below against the downloaded files before running the installer.
-
-Checksums:
-- Full media zip: `<replace with final SHA256>`
-- Online media zip: `<replace with final SHA256>`
-```
+Use `docs/releases/hypersearch-1.0-github-release.md` as the staged GitHub
+release body. It includes the marketing banner, install guidance, image names,
+and final hashes.
 
 ## Final Validation To Record
 
 Record these results in the release notes after the final build:
 
-- Python test suite
-- UI build
-- Desktop frontend build
-- Desktop native `cargo check`
+- Python test suite: passed during release posture validation
+- UI build: passed during release posture validation and release media build
+- Desktop frontend build: passed during release media build
+- Desktop native `cargo check`: passed during release posture validation
 - Installer PowerShell parse check
 - Release security check
 - Production npm audits for UI and desktop
 - Docker Compose release and development config validation
-- Tauri release build, MSI, and NSIS installer generation
-- Docker image archive and both installer media channels
+- Tauri release build, MSI, and NSIS installer generation: passed for `PublicRelease_20260509`
+- Docker image archive and both installer media channels: passed for `PublicRelease_20260509`
 - Release stack readiness at `/v1/ready`
 - Search-only smoke with no LM Studio
 - Research fallback smoke with no LM Studio

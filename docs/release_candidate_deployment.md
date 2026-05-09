@@ -1,6 +1,6 @@
-# HyperSearch 1.0 Private Release Candidate Deployment
+# HyperSearch 1.0 Release Deployment
 
-This guide is the durable reference for building and testing the private HyperSearch 1.0 release candidate.
+This guide is the durable reference for building and testing the HyperSearch 1.0 release.
 
 ## Release Shape
 
@@ -11,46 +11,40 @@ HyperSearch now has two installer media channels:
 
 The 1.0 release should use full media whenever possible. The online installer is still useful for connected systems where public image pulls are expected to work.
 
-For GitHub distribution, do not commit generated binaries or image archives. Zip the generated `Online` and `Full` media folders and upload those zip files as release assets. See `docs/github_release_distribution_1_0_2026-05-09.md` for the current 1.0 asset names, checksum placeholders, and release description template.
+For GitHub distribution, do not commit generated binaries or image archives. Zip the generated `Online` and `Full` media folders and upload those zip files as release assets. See `docs/github_release_distribution_1_0_2026-05-09.md` for the current 1.0 asset names, checksums, and release description template.
 
 ## Repository And Registries
 
-The planned private repository is:
+The repository is:
 
 ```text
 git@github.com:Nacsez/HyperSearch.git
 ```
 
-Container images are built for both registries:
+The 1.0 online path uses GitHub Container Registry images:
 
 ```text
 ghcr.io/nacsez/hypersearch-api:1.0.0
 ghcr.io/nacsez/hypersearch-ui:1.0.0
-docker.io/nacsez/hypersearch-api:1.0.0
-docker.io/nacsez/hypersearch-ui:1.0.0
 ```
+
+Docker Hub publishing remains optional and is not required for the 1.0 GitHub release.
 
 For public 1.0 media, bundled image archives are preferred for normal users because they avoid first-run registry and network problems. The local-build fallback keeps connected machines unblocked, but full media remains the expected public path because it avoids both registry credentials and first-run source builds.
 
 ## Build Commands
 
-Build local images and create an image archive:
+Build local images, create an image archive, and build both installer channels:
 
 ```powershell
-.\scripts\Build-ContainerImages.ps1 -Version 1.0.0 -RegistryMode Both -SaveArchive
-```
-
-Build both installer channels:
-
-```powershell
-.\scripts\Build-InstallationMedia.ps1 -RunName RC1 -Channel Both -Version 1.0.0 -ImageArchivePath .\artifacts\images\hypersearch-images-1.0.0.tar
+.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260509 -Channel Both -Version 1.0.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
 ```
 
 Optionally include locally downloaded prerequisite installers in the full media payload:
 
 ```powershell
 .\scripts\Build-InstallationMedia.ps1 `
-  -RunName RC1-Full `
+  -RunName PublicRelease_20260509-Full `
   -Channel Full `
   -Version 1.0.0 `
   -ImageArchivePath .\artifacts\images\hypersearch-images-1.0.0.tar `
@@ -101,7 +95,7 @@ The desktop launcher writes:
 
 Use **Settings > Export Diagnostics** in the desktop launcher before collecting manual issue notes. The bundle redacts token, key, password, auth, and credential values across env files, compose output, command logs, and desktop logs.
 
-## Beta Acceptance Criteria
+## Release Acceptance Criteria
 
 - Full media installs on a clean Windows 11 test machine.
 - Docker images load from bundled archives without registry access.

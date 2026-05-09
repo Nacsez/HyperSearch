@@ -2,17 +2,25 @@
 
 This plan covers the remaining work between the current 1.0 release-prep state and a public HyperSearch release. It assumes the repository will be released from the current `main` branch after the final release-prep commit is pushed.
 
-```text
-main / origin/main: 7d7021f Add installer WSL update remediation
-```
+The final release-prep branch is `main`; publish from the release commit pushed
+after the final media/hash documentation update.
 
 Final release media:
 
 ```text
-Installation Media\PublicRelease_YYYYMMDD
+Installation Media\PublicRelease_20260509
 ```
 
-The earlier `WslUpdatePolish_20260508` media is superseded by the final 1.0 release-prep changes. Rebuild final media from the release commit and publish the resulting SHA256 hashes in the GitHub release.
+The earlier `WslUpdatePolish_20260508` media is superseded by the final 1.0
+release-prep changes. The staged public release media is:
+
+```text
+HyperSearch_1.0.0_Full_PublicRelease_20260509.zip
+SHA256 0fa8a0ef2a83f04802150f0f9dbb935aca94c55cc2f94abaaae4083ab7229590
+
+HyperSearch_1.0.0_Online_PublicRelease_20260509.zip
+SHA256 77ec1b22904306c1360322c0688655ae2ee61c01cdb8982f5b3e1c21daaedcfb
+```
 
 ## Release Goal
 
@@ -46,7 +54,7 @@ Use the full media zip first. This is the most important release path because it
 Test procedure:
 
 1. Start from a clean Windows 10/11 machine or VM without relying on existing HyperSearch state.
-2. Download or copy `HyperSearch_1.0.0_Full_PublicRelease_YYYYMMDD.zip`.
+2. Download or copy `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`.
 3. Verify the zip hash matches the SHA256 published on the GitHub release.
 4. Extract the zip to a writable folder.
 5. Run `HyperSearch_1.0.0_x64-setup.exe`.
@@ -79,7 +87,7 @@ Before publishing a public release, decide which distribution paths are official
 
 Required asset checks:
 
-- Upload the full and online media zips from `Installation Media\PublicRelease_YYYYMMDD`.
+- Upload the full and online media zips from `Installation Media\PublicRelease_20260509`.
 - Publish SHA256 checksums in the release description.
 - Download the uploaded assets from GitHub and verify hashes after upload.
 - Run at least one install from the downloaded GitHub asset, not only the local build folder.
@@ -87,7 +95,8 @@ Required asset checks:
 Online media gate:
 
 - If online media remains a public asset, unauthenticated image pulls must work from a machine with no registry login.
-- Either make the required GHCR/Docker Hub images public and test `docker compose pull`, or clearly position online media as an advanced connected-install path and recommend full media for normal users.
+- Run the GitHub Actions workflow **Publish Container Images** for `version=1.0.0`, keep Docker Hub publishing off unless you intentionally configure Docker Hub secrets, make the GHCR packages public, and test `docker compose pull` from a clean machine.
+- If the GHCR packages are not public yet, position online media as an advanced connected-install path and recommend full media for normal users.
 
 ## Phase 3 - Repository Public-Readiness
 
@@ -98,7 +107,7 @@ These items should be complete before changing repository visibility:
 - Review `docs/security_signing_release_plan_2026-05-09.md` and confirm the release notes describe the no-cost unsigned 1.0 path with SHA256 verification.
 - Confirm `README.md` leads with end-user install guidance before developer setup details.
 - Confirm `CHANGELOG.md` has the final release date and validation summary.
-- Confirm `docs/github_release_distribution_1_0_2026-05-09.md` points at the final asset names and checksum placeholders are replaced after the final build.
+- Confirm `docs/github_release_distribution_1_0_2026-05-09.md` points at the final asset names and SHA256 hashes.
 - Confirm no private-only notes remain in first-viewport public documentation.
 - Run a secrets scan over tracked files and confirm no `.env`, token, password, pairing token, or local machine path leak is being published as a credential.
 - Confirm `.gitignore` keeps installer binaries, image archives, logs, runtime state, local `.env`, and diagnostics out of source history.
@@ -125,7 +134,7 @@ cd apps/desktop; npm.cmd run build; cd ..\..
 cd apps/desktop/src-tauri; cargo check; cd ..\..\..
 cd infra/docker; docker compose --project-name hypersearch config --quiet; cd ..\..
 cd infra/docker; docker compose --project-name hypersearch -f docker-compose.yml -f docker-compose.dev.yml config --quiet; cd ..\..
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_YYYYMMDD -Channel Both -Version 1.0.0 -ImageArchivePath "<path-to-image-archive>" -SigningMode Verify
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260509 -Channel Both -Version 1.0.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
 ```
 
 After the final build:
