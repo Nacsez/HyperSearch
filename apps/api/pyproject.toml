@@ -33,7 +33,7 @@ playwright = [
 ]
 dev = [
   "pytest>=8.3,<9.0",
-  "pytest-asyncio>=0.24,<1.0",
+  "pytest-asyncio>=0.24,<2.0",
 ]
 all = [
   "redis>=5.2,<6.0",
@@ -43,7 +43,7 @@ all = [
   "opentelemetry-instrumentation-fastapi>=0.50b0,<1.0",
   "playwright>=1.50,<2.0",
   "pytest>=8.3,<9.0",
-  "pytest-asyncio>=0.24,<1.0",
+  "pytest-asyncio>=0.24,<2.0",
 ]
 
 [tool.setuptools]
