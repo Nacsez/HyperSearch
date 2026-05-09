@@ -22,6 +22,7 @@ HyperSearch 1.0 public release.
 | API runtime image | `dependabot/docker/apps/api/python-3.14-slim` | Updated API image base to `python:3.14-slim`. | Remaining GitHub alerts appeared to include Docker base images. Python 3.14 built successfully with current wheels. |
 | UI build image | `dependabot/docker/apps/ui/node-26-alpine` | Updated UI build stage to `node:26-alpine`. | Remaining GitHub alerts appeared to include Docker base images. The Vite 8 UI image build passed with Node 26. |
 | UI runtime image | `dependabot/docker/apps/ui/nginx-1.29-alpine` | Updated the UI Docker runtime stage from `nginx:1.27-alpine` to `nginx:1.29-alpine`. | Low-risk exact-tag source-build fallback image update. |
+| API test/build tooling | `dependabot/pip/apps/api/pytest-gte-8.3-and-lt-10.0`, `dependabot/pip/apps/api/pytest-asyncio-gte-0.24-and-lt-2.0` | Raised `pytest` to `>=9.0.3,<10.0`, allowed `pytest-asyncio` 1.x, raised build-time `setuptools` to `>=78.1.1`, and removed dev/test extras from the production API image install. | A temporary `pip-audit` environment showed `pytest 8.4.2` vulnerable under the old `<9` cap. `setuptools>=78.1.1` avoids current setuptools advisories in build isolation. Dev tools should not ship in the runtime image. |
 
 ## Deferred Or Rejected For 1.0
 
@@ -34,8 +35,6 @@ HyperSearch 1.0 public release.
 | `dependabot/npm_and_yarn/apps/desktop/typescript-6.0.3` | Defer | Same TypeScript 6 major tooling risk. |
 | `dependabot/npm_and_yarn/apps/ui/types/node-25.6.2` | Defer | Type-only major update. Not needed for release security. |
 | `dependabot/cargo/apps/desktop/src-tauri/rand-0.10.1` | Defer | Major API change for token generation code; not tied to the active release security alerts. |
-| `dependabot/pip/apps/api/pytest-gte-8.3-and-lt-10.0` | Defer | Broadens dev dependency upper bound and makes future installs less predictable. Current tests pass. |
-| `dependabot/pip/apps/api/pytest-asyncio-gte-0.24-and-lt-2.0` | Defer | Broadens dev dependency upper bound. Current tests pass. |
 | `dependabot/pip/apps/api/redis-gte-5.2-and-lt-8.0` | Defer | Broadens runtime dependency upper bound across major Redis client versions; not required for a known current vulnerability. |
 | `dependabot/pip/apps/api/trafilatura-gte-1.12-and-lt-3.0` | Defer | Broadens extraction dependency upper bound across a major version; source extraction behavior is release-critical. |
 
@@ -54,8 +53,13 @@ HyperSearch 1.0 public release.
 - `npm run build` in `apps/desktop`: passed with Vite 8.
 - `cargo check` in `apps/desktop/src-tauri`: passed with Tauri 2.11.1.
 - `pytest`: 19 passed, 1 skipped.
+- Temporary clean API audit environment: installed `hypersearch-api[all]` with
+  `pytest 9.0.3` and `pytest-asyncio 1.3.0`; `pip-audit` reported no known
+  vulnerabilities.
 - Release media rebuild: passed for `PublicRelease_20260509` after dependency
   remediation.
+- Production API image check: `pytest` is not installed in
+  `hypersearch-api:1.0.0`; `setuptools` resolves to `82.0.1`.
 - Rebuilt-image stack smoke: `hypersearch-api:1.0.0`,
   `hypersearch-ui:1.0.0`, Caddy, SearXNG, and Valkey started successfully;
   `/v1/ready` returned `status="ready"` with search ready and LLM unavailable
@@ -67,9 +71,13 @@ HyperSearch 1.0 public release.
   chain issues, not direct HyperSearch code or the Windows release target, and
   should be tracked after 1.0 while staying current with Tauri.
 - Final rebuilt full media zip SHA256:
-  `ae4c2df17ccb3f4be00c3a6f72501c9fbe4b55147450a3dc6a7fdabb084856e9`.
+  `793b2017b0018f8f5b3e53d37cc3d07c203190cd1bd472fe25c076f0e749685c`.
 - Final rebuilt online media zip SHA256:
-  `f656d0b0628b957472d39ad87430856b275929ce8c0f7e66b29776f0a3755a00`.
+  `76b5308fcde685f8c2aa888a5bc51707d36c9b0037315bc6c0ecb8386e548887`.
+- Final rebuilt NSIS setup SHA256:
+  `7099237dba83c3a9fa949eb3a00ee1faf7d62bbd3c52bc71faa895502c9a734a`.
+- Final rebuilt full-media image archive SHA256:
+  `a0dc23a28ea147bc9732532dca720a1517bd0f25c00937dcf8fbbcb0e3c9f8d2`.
 
 ## Remaining GitHub Cleanup
 
