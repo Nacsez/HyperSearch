@@ -14,13 +14,13 @@ The installer still needs internet access when Docker Desktop or LM Studio must 
 
 | Asset | Use this when | SHA256 |
 | --- | --- | --- |
-| `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip` | You want the easiest first install or an offline-ready HyperSearch image payload after Docker is installed. | `0fa8a0ef2a83f04802150f0f9dbb935aca94c55cc2f94abaaae4083ab7229590` |
-| `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip` | You already have reliable internet and want the smaller package. | `77ec1b22904306c1360322c0688655ae2ee61c01cdb8982f5b3e1c21daaedcfb` |
+| `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip` | You want the easiest first install or an offline-ready HyperSearch image payload after Docker is installed. | `10f4a42e55a94d88bae0f2091a2eb39cf0cb2d12b1e7c8a6b45edbb511d675c1` |
+| `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip` | You already have reliable internet and want the smaller package. | `d44929b62f9bd4c9d83d6ef92723aa16845438c6c8b908392ae04d5a15505f2e` |
 | `HyperSearch_1.0.0_x64-setup.exe` | You only need the Windows installer from inside one of the media packages. | See the included `checksums.sha256`. |
 
 ## What You Get
 
-- A Windows desktop application published as HyperSearch by Robert Choudury.
+- A Windows desktop application from Robert Choudury, published as HyperSearch.
 - Local search backed by the packaged Docker service stack.
 - Search-only mode as a supported first-class setup.
 - Optional LM Studio/local LLM workflows for synthesis, summaries, and deeper research.
@@ -36,7 +36,7 @@ The installer still needs internet access when Docker Desktop or LM Studio must 
 4. Let the installer check Docker, WSL, and optional LM Studio readiness.
 5. Launch HyperSearch and start a session.
 
-If Docker Desktop or LM Studio is missing, the installer can guide their setup. On some Windows systems the WSL engine must be updated before Docker will run; the installer now checks for that and offers the update path.
+If Docker Desktop or LM Studio is missing, the installer can guide their setup. On some Windows systems the WSL engine must be updated before Docker will run; the installer checks for that and offers the update path.
 
 ## Container Images
 

@@ -41,17 +41,19 @@ The npm package-lock files carry transitive package license metadata. This gener
 
 | Package lock | License expression | Package count |
 | --- | --- | ---: |
+| `apps/ui/package-lock.json` | `0BSD` | 1 |
 | `apps/ui/package-lock.json` | `Apache-2.0` | 2 |
 | `apps/ui/package-lock.json` | `BSD-3-Clause` | 1 |
-| `apps/ui/package-lock.json` | `CC-BY-4.0` | 1 |
-| `apps/ui/package-lock.json` | `ISC` | 5 |
-| `apps/ui/package-lock.json` | `MIT` | 109 |
+| `apps/ui/package-lock.json` | `ISC` | 1 |
+| `apps/ui/package-lock.json` | `MIT` | 45 |
+| `apps/ui/package-lock.json` | `MPL-2.0` | 12 |
+| `apps/desktop/package-lock.json` | `0BSD` | 1 |
 | `apps/desktop/package-lock.json` | `Apache-2.0` | 2 |
 | `apps/desktop/package-lock.json` | `Apache-2.0 OR MIT` | 13 |
 | `apps/desktop/package-lock.json` | `BSD-3-Clause` | 1 |
-| `apps/desktop/package-lock.json` | `CC-BY-4.0` | 1 |
-| `apps/desktop/package-lock.json` | `ISC` | 5 |
-| `apps/desktop/package-lock.json` | `MIT` | 105 |
+| `apps/desktop/package-lock.json` | `ISC` | 1 |
+| `apps/desktop/package-lock.json` | `MIT` | 41 |
+| `apps/desktop/package-lock.json` | `MPL-2.0` | 12 |
 
 ## Rust Direct Dependencies
 
