@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, RngExt};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -1535,7 +1535,7 @@ fn set_lan_mode_sync(enabled: bool) -> Result<String, String> {
     let root = repo_root()?;
     let compose_env = root.join("infra").join("docker").join(".env");
     let root_env = root.join(".env");
-    let token: String = rand::thread_rng()
+    let token: String = rand::rng()
         .sample_iter(&Alphanumeric)
         .take(40)
         .map(char::from)
