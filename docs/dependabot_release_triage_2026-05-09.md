@@ -83,8 +83,20 @@ HyperSearch 1.0 public release.
 
 ## Remaining GitHub Cleanup
 
-After GitHub app access is refreshed, close or mark superseded PRs for the
-deferred branches above, then rerun the repository vulnerability view. The likely
-release blocker alerts should be cleared by the Vite/esbuild and Tauri updates;
-any remaining Dependabot items should be reviewed as planned post-1.0 dependency
-modernization unless GitHub flags them as direct runtime vulnerabilities.
+After all inferable Dependabot branch remediations were committed and pushed,
+GitHub still reported two alerts on the default branch: one moderate and one low.
+The GitHub connector is still expired and `gh` is not installed, so the exact
+alert records could not be opened from this environment.
+
+Required follow-up with refreshed GitHub security access:
+
+1. Open `https://github.com/Nacsez/HyperSearch/security/dependabot`.
+2. Confirm the two remaining alerts by package and advisory ID.
+3. If they match the transitive Tauri/Linux GTK or GLib advisories still shown
+   by `cargo-audit`, mark them as accepted risk/not applicable for the Windows
+   1.0 release and track upstream Tauri updates after release.
+4. If either alert names a direct HyperSearch runtime dependency, treat it as a
+   release blocker and patch before publishing.
+5. Close or mark superseded Dependabot PRs for branches already remediated on
+   `main`; leave deferred modernization branches open only if they are useful
+   post-1.0.
