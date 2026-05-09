@@ -21,7 +21,7 @@ cache = [
   "redis>=5.2,<6.0",
 ]
 extract = [
-  "trafilatura>=1.12,<2.0",
+  "trafilatura>=1.12,<3.0",
 ]
 observability = [
   "opentelemetry-api>=1.29,<2.0",
@@ -37,7 +37,7 @@ dev = [
 ]
 all = [
   "redis>=5.2,<6.0",
-  "trafilatura>=1.12,<2.0",
+  "trafilatura>=1.12,<3.0",
   "opentelemetry-api>=1.29,<2.0",
   "opentelemetry-sdk>=1.29,<2.0",
   "opentelemetry-instrumentation-fastapi>=0.50b0,<1.0",
