@@ -58,6 +58,9 @@ jobs:
       - name: Install desktop dependencies
         working-directory: apps/desktop
         run: npm ci
+      - name: Build desktop frontend
+        working-directory: apps/desktop
+        run: npm run build
       - name: Cargo check
         working-directory: apps/desktop/src-tauri
         run: cargo check

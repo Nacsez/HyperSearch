@@ -101,3 +101,20 @@ Required follow-up with refreshed GitHub security access:
 5. Close or mark superseded Dependabot PRs for branches already remediated on
    `main`; leave deferred modernization branches open only if they are useful
    post-1.0.
+
+## Follow-Up Completed 2026-05-10
+
+- Installed and authenticated GitHub CLI locally after the Codex GitHub
+  connector remained expired.
+- Confirmed alert 3 is `glib` advisory `GHSA-wrw7-89jp-8q8g` in
+  `apps/desktop/src-tauri/Cargo.lock`.
+- Dismissed alert 3 as accepted/tolerable risk for 1.0 with this release
+  rationale: it is in the transitive Tauri/Wry Linux GTK dependency chain,
+  while the packaged 1.0 desktop release is Windows-focused and the Windows
+  cargo check tree does not pull `glib`.
+- Closed Dependabot PRs 6, 10, 11, 13, 15, and 17 as deferred post-1.0
+  modernization work because they were React 19, TypeScript 6, or
+  `@types/node` 25 updates with non-clean CI and no active release-blocking
+  security alert.
+- Verified no open GitHub issues, pull requests, or Dependabot alerts remained
+  after cleanup.
