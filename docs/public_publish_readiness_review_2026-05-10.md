@@ -38,6 +38,8 @@ visibility changes where GitHub only enables a feature for public repositories.
 - Added a conventional root `LICENSE` file containing the full AGPL text so
   GitHub license detection can identify the project more reliably while
   preserving `LICENSE.md` as the project-specific license posture note.
+- Verified GitHub now detects the repository license as GNU Affero General
+  Public License v3.0.
 - Updated GitHub repository metadata while the repository remains private:
   description, homepage, and public-facing topics.
 - Ran the GitHub Actions **Publish Container Images** workflow for `version=1.0.0`
@@ -46,35 +48,43 @@ visibility changes where GitHub only enables a feature for public repositories.
 - Confirmed the workflow pushed both GHCR images successfully, but clean
   unauthenticated manifest checks still returned `unauthorized` until package
   visibility is changed to public.
+- Created and pushed the final `v1.0.0` release tag.
+- Retargeted the draft GitHub release to `v1.0.0` and updated the release body
+  with the current hashes from `docs/releases/hypersearch-1.0-github-release.md`.
+- Uploaded the staged release assets to the draft GitHub release:
+  - `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`
+  - `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip`
+  - `HyperSearch_1.0.0_x64-setup.exe`
+  - `release-assets.sha256`
+  - `signing-summary.json`
+- Verified GitHub release asset digests match the staged SHA256 values for the
+  Full media ZIP, Online media ZIP, and setup EXE.
 
 ## Must Fix Before Public Release Announcement
 
 ### 1. Upload Release Assets
 
-Severity: High
+Severity: Fixed
 
 Evidence: `gh release view 1.0 --repo Nacsez/HyperSearch` reported
 `assets: []`.
 
-Required action:
+Action taken:
 
 - Upload `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`.
-- Upload `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip` only if the
-  GHCR images are published and public, or remove the Online asset from the
-  release plan.
+- Upload `HyperSearch_1.0.0_Online_PublicRelease_20260509.zip`.
 - Upload `release-assets.sha256`.
-- Consider also uploading standalone `HyperSearch_1.0.0_x64-setup.exe`,
-  `HyperSearch_1.0.0_x64_en-US.msi`, and `signing-summary.json` as optional
-  advanced assets.
+- Upload standalone `HyperSearch_1.0.0_x64-setup.exe`.
+- Upload `signing-summary.json`.
 
-Publish gate:
+Remaining gate:
 
-- Do not publish the GitHub release until the assets visible on the draft match
-  the checksums in the release body.
+- Do not publish the GitHub release until the GHCR packages are public or the
+  Online asset is removed from the release.
 
 ### 2. Fix Draft Release Hashes
 
-Severity: High
+Severity: Fixed
 
 Evidence: the GitHub draft release body currently lists old hashes:
 
@@ -92,11 +102,9 @@ Those do not match the current local `release-assets.sha256` values:
 
 Required action:
 
-- Replace the draft release body with
-  `docs/releases/hypersearch-1.0-github-release.md`, or manually update the
-  GitHub draft to the current hashes.
-- After upload, download each release asset back from GitHub and recompute
-  SHA256 to confirm GitHub-hosted bytes match the published checksums.
+- Replaced the draft release body with
+  `docs/releases/hypersearch-1.0-github-release.md`.
+- Confirmed GitHub release asset digest values match the current staged hashes.
 
 ### 3. Publish Or Remove The Online GHCR Install Path
 
@@ -129,7 +137,7 @@ Alternative:
 
 ### 4. Finalize Tag Naming And Target Commit
 
-Severity: Medium
+Severity: Fixed
 
 Evidence:
 
@@ -139,10 +147,10 @@ Evidence:
 
 Required action:
 
-- Choose the final tag convention, preferably `v1.0.0` or `1.0.0`.
-- Create the tag on commit `995947a` or on a later final media rebuild commit.
-- Update the GitHub draft release to use that tag.
-- Avoid a moving `main` target for the published release.
+- Chose final tag `v1.0.0`.
+- Created and pushed `v1.0.0`.
+- Updated the GitHub draft release to use `v1.0.0`.
+- Avoided a moving `main` target for the published release.
 
 ### 5. Decide Whether To Rebuild Media From The Exact Final Commit
 
@@ -170,7 +178,7 @@ Recommendation:
 
 ### 6. Resolve GitHub License Detection
 
-Severity: Fixed Locally, Verify After Push
+Severity: Fixed
 
 Evidence:
 
@@ -184,8 +192,7 @@ Action taken:
 
 Follow-up:
 
-- After this change is pushed, re-check GitHub repository license detection.
-  It may take GitHub a short time to refresh.
+- GitHub repository API now reports GNU Affero General Public License v3.0.
 
 ### 7. Confirm GitHub Security Features After Visibility Change
 
