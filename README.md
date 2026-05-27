@@ -1,6 +1,6 @@
 # HyperSearch
 
-HyperSearch is a local-control search and research service for people who want their own searchable history, local caching, and local-model synthesis without depending on a cloud model provider. The 1.0 target is Windows-first, desktop-launched, localhost by default, and LAN-capable only through an explicit pairing-token flow.
+HyperSearch is a local-control search and research service for people who want their own searchable history, local caching, and local-model synthesis without depending on a cloud model provider. The 1.1 target is Windows-first, desktop-launched, localhost by default, and LAN-capable only through an explicit pairing-token flow.
 
 ## What is included
 
@@ -13,21 +13,23 @@ HyperSearch is a local-control search and research service for people who want t
 - Smoke/benchmark scripts and a Linux install helper
 - Unit, integration, and live-smoke test scaffolding
 
-## Install HyperSearch 1.0
+## Install HyperSearch 1.1
 
 The recommended public install path is the **Full Installation Media** ZIP from
 GitHub Releases:
 
-1. Download `HyperSearch_1.0.0_Full_PublicRelease_20260509.zip`.
+1. Download the 1.1 Full Installation Media ZIP.
 2. Verify the published SHA256 checksum before running the installer.
 3. Extract the ZIP to a writable folder.
-4. Run `HyperSearch_1.0.0_x64-setup.exe`.
-5. Follow the installer prompts for Docker Desktop, WSL update handling, and optional LM Studio setup.
+4. Run `HyperSearch_1.1.0_x64-setup.exe`.
+5. Follow the **HyperSearch Installation Wizard** prompts for license consent, Standard or Custom install, Docker/WSL readiness, LM Studio setup, model choice, stack startup, optional Windows sign-in startup, and diagnostics.
 
 Full media includes the HyperSearch installer and bundled Docker image archive.
-Docker Desktop and LM Studio are third-party tools and may still require internet
-access when they need to be installed or updated. Search-only mode is a supported
-success state; LM Studio is optional.
+Standard install uses the bundled images so Docker Hub sign-in is not required
+for HyperSearch startup. Docker Desktop and LM Studio are third-party tools and
+may still require internet access when they need to be installed or updated.
+Search-only mode is a supported success state; LM Studio and model download are
+optional.
 
 The Online media ZIP is smaller and uses the public GHCR images:
 
@@ -45,7 +47,7 @@ systems.
 - The app-level LLM toggle is stored locally. `HYPERSEARCH_LLM_ENABLED=false` or `HYPERSEARCH_RESEARCH_CAPABILITY=search-only` starts HyperSearch in search-only mode.
 - Browser/API access binds to localhost by default.
 - LAN access is opt-in and protected by a pairing token managed by the desktop launcher.
-- Docker remains the backend runtime for 1.0, but the desktop launcher is the preferred user entrypoint.
+- Docker remains the backend runtime for 1.1, but the desktop launcher is the preferred user entrypoint.
 
 ## Quick Start
 
@@ -110,22 +112,28 @@ The deploy helper wraps the Docker Compose stack in `infra/docker`, uses an isol
 ### Release Media
 
 ```powershell
-.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260509 -Channel Both -Version 1.0.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
+.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_1_1 -Channel Full -Version 1.1.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
 ```
 
 The generated media supports:
 
-- online installer media that pulls prebuilt images
 - full installer media that loads bundled Docker image archives and carries image digest manifests
+- custom online installer mode that can pull prebuilt images when explicitly selected
+- the HyperSearch Installation Wizard with Standard and Custom install paths
+- `install-profile.json` import into the desktop launcher for first-run provider/model/default settings
 - installer and desktop command logs under `%LOCALAPPDATA%\HyperSearch\logs`
 - diagnostics export under `%LOCALAPPDATA%\HyperSearch\diagnostics` with token/key/password/auth values redacted
 
 For GitHub distribution, upload the generated media ZIP archives as release
-assets rather than committing installer binaries to the repository. Use online
-media for small connected installs and full media for users who should not
-depend on registry access during first launch. The 1.0 asset handoff workflow is
-documented in `docs/github_release_distribution_1_0_2026-05-09.md`, and the
-staged release body is in `docs/releases/hypersearch-1.0-github-release.md`.
+assets rather than committing installer binaries to the repository. Use full
+media as the public default so users do not depend on registry access during
+first launch. The 1.1 installer architecture and test matrix are documented in
+`docs/windows_installation_wizard_1_1_design.md` and
+`docs/windows_installer_test_plan.md`.
+
+The local Hyper-V release gate is documented in `docs/hyperv_installer_lab.md`.
+For v1.1, the gate targets supported Windows 10 22H2 and Windows 11 23H2+
+baselines and runs through `tools/installer-lab/Invoke-HyperSearchVmReleaseGate.ps1`.
 
 ## In-App Help
 
@@ -180,7 +188,7 @@ refresh those notice files before packaging and include them at the media root.
 
 ## Status
 
-This repository is staged for the HyperSearch 1.0 public release. Runtime use
+This repository is staged for the HyperSearch 1.1 public release. Runtime use
 requires Docker Desktop for the local service stack. Local LLM synthesis requires
 an enabled local provider, but search, source review, diagnostics, and session
 saving remain available without one.

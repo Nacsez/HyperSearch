@@ -28,8 +28,10 @@ infra/docker/.env
 .docker/
 data/
 logs/
+Testing Logs/
 Installation Media/
 installer/payload/
+tools/installer-lab/configs/*.local.json
 *.log
 *.tmp
 *.bak

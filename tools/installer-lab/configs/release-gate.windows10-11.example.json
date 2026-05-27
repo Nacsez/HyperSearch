@@ -1,0 +1,290 @@
+{
+  "labRoot": "%LOCALAPPDATA%\\HyperSearch\\installer-lab",
+  "mediaRoot": "C:\\Users\\Seeker\\source\\Workbooks\\HyperSearch\\Installation Media\\PublicRelease_1_1\\Full",
+  "installerExe": "HyperSearch_1.1.0_x64-setup.exe",
+  "guestCredentialPath": "C:\\tmp\\hypersearch-lab-credential.xml",
+  "guestUser": "HyperSearchAdmin",
+  "guestPasswordEnv": "HYPERSEARCH_LAB_GUEST_PASSWORD",
+  "guestWorkRoot": "C:\\HyperSearchInstallerLab",
+  "defaultExpectedResults": ["passed", "warning"],
+  "defaultGuestTimeoutSeconds": 18000,
+  "defaultVmReadyTimeoutSeconds": 1800,
+  "defaultProgressPollSeconds": 30,
+  "defaultNoProgressPollLimit": 8,
+  "releaseGate": {
+    "windows10": {
+      "vmName": "HyperSearchLab-Win10-22H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "minimumBuild": 19045,
+      "dockerDesktopSupportTier": "supported"
+    },
+    "windows11": {
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "minimumBuild": 22631,
+      "dockerDesktopSupportTier": "supported"
+    }
+  },
+  "scenarios": [
+    {
+      "name": "win10-nsis-bootstrap-smoke",
+      "vmName": "HyperSearchLab-Win10-22H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "nsis",
+      "installerTimeoutSeconds": 900,
+      "skipStateAssertions": true,
+      "expectedInstallerTimedOut": false,
+      "description": "Windows 10 NSIS/WebView2 bootstrap smoke. This catches hangs before the HyperSearch installer core starts.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": false,
+        "installLmStudio": false,
+        "imageSource": "skip",
+        "startStack": false,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      }
+    },
+    {
+      "name": "win10-fresh-standard-full",
+      "vmName": "HyperSearchLab-Win10-22H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 10 22H2 build 19045+ fresh install with no Docker and no LM Studio.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "standard",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": true,
+        "imageSource": "bundled",
+        "startStack": true,
+        "enableLoginAutostart": false,
+        "usagePreset": "general-research",
+        "selectedModel": "recommended",
+        "downloadModel": false
+      },
+      "expectedResults": ["passed"],
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoInstallerWarnings": true,
+        "requireLmStudioReady": true,
+        "requireNoComposeEnvBom": true,
+        "requireLmStudioPendingDisablesLlm": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win10-compose-env-bom",
+      "vmName": "HyperSearchLab-Win10-22H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 10 regression for Docker Compose .env files with a UTF-8 BOM.",
+      "guestPrepareScript": "guest\\Seed-ComposeEnvBom.ps1",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": false,
+        "imageSource": "bundled",
+        "startStack": true,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      },
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoComposeEnvBom": true,
+        "requireLmStudioPendingDisablesLlm": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win10-search-only-skip-lmstudio",
+      "vmName": "HyperSearchLab-Win10-22H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 10 custom install with LM Studio skipped and search-only defaults.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": false,
+        "imageSource": "bundled",
+        "startStack": true,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      },
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoComposeEnvBom": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win11-nsis-bootstrap-smoke",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "nsis",
+      "installerTimeoutSeconds": 900,
+      "skipStateAssertions": true,
+      "expectedInstallerTimedOut": false,
+      "description": "Windows 11 NSIS/WebView2 bootstrap smoke. This catches hangs before the HyperSearch installer core starts.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": false,
+        "installLmStudio": false,
+        "imageSource": "skip",
+        "startStack": false,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      }
+    },
+    {
+      "name": "win11-fresh-standard-full",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 11 23H2+ fresh install with no Docker and no LM Studio.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "standard",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": true,
+        "imageSource": "bundled",
+        "startStack": true,
+        "enableLoginAutostart": false,
+        "usagePreset": "general-research",
+        "selectedModel": "recommended",
+        "downloadModel": false
+      },
+      "expectedResults": ["passed"],
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoInstallerWarnings": true,
+        "requireLmStudioReady": true,
+        "requireNoComposeEnvBom": true,
+        "requireLmStudioPendingDisablesLlm": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win11-nsis-standard-full",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "nsis",
+      "allowRebootResume": true,
+      "installerTimeoutSeconds": 5400,
+      "progressPollSeconds": 30,
+      "noProgressPollLimit": 8,
+      "description": "Windows 11 public NSIS Standard Full path with Docker, bundled images, LM Studio, stack startup, and opt-in login autostart.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "standard",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": true,
+        "imageSource": "bundled",
+        "startStack": true,
+        "enableLoginAutostart": true,
+        "usagePreset": "general-research",
+        "selectedModel": "recommended",
+        "downloadModel": false
+      },
+      "expectedResults": ["passed"],
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoInstallerWarnings": true,
+        "requireLmStudioReady": true,
+        "requireLoginAutostart": true,
+        "requireNoComposeEnvBom": true,
+        "requireLmStudioPendingDisablesLlm": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win11-compose-env-bom",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 11 regression for Docker Compose .env files with a UTF-8 BOM.",
+      "guestPrepareScript": "guest\\Seed-ComposeEnvBom.ps1",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": false,
+        "imageSource": "bundled",
+        "startStack": true,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      },
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoComposeEnvBom": true,
+        "forbidInvalidModelId": true
+      }
+    },
+    {
+      "name": "win11-search-only-skip-lmstudio",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "allowRebootResume": true,
+      "description": "Windows 11 custom install with LM Studio skipped and search-only defaults.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "custom",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "installLmStudio": false,
+        "imageSource": "bundled",
+        "startStack": true,
+        "usagePreset": "search-only",
+        "selectedModel": "search-only",
+        "downloadModel": false
+      },
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoComposeEnvBom": true,
+        "forbidInvalidModelId": true
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 [package]
 name = "hypersearch-desktop"
-version = "1.0.0"
+version = "1.1.0"
 description = "HyperSearch Windows launcher"
 authors = ["Robert Choudury"]
 license = "AGPL-3.0-only"

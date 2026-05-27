@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.1.0",
     [ValidateSet("GHCR", "DockerHub", "Both")]
     [string]$RegistryMode = "GHCR",
     [string]$GhcrNamespace = "ghcr.io/nacsez",

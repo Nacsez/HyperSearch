@@ -2,14 +2,15 @@
 param(
     [string]$RunName = ("TestRun_{0}" -f (Get-Date -Format "yyyyMMdd_HHmmss")),
     [ValidateSet("Online", "Full", "Both")]
-    [string]$Channel = "Both",
-    [string]$Version = "1.0.0",
+    [string]$Channel = "Full",
+    [string]$Version = "1.1.0",
     [ValidateSet("GHCR", "DockerHub", "Both")]
     [string]$RegistryMode = "GHCR",
     [string]$GhcrNamespace = "ghcr.io/nacsez",
     [string]$DockerHubNamespace = "docker.io/nacsez",
     [string]$ImageArchivePath = "",
     [string]$DockerDesktopInstallerPath = "",
+    [string]$WslInstallerPath = "",
     [string]$LmStudioInstallerPath = "",
     [switch]$BuildImages,
     [switch]$PushImages,
@@ -134,6 +135,12 @@ function Copy-BaseArtifacts {
     Copy-Item -LiteralPath $msi -Destination (Join-Path $Destination "HyperSearch_${Version}_x64_en-US.msi") -Force
     Copy-Item -LiteralPath $exe -Destination (Join-Path $Destination "hypersearch-desktop.exe") -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs\windows_installer_test_plan.md") -Destination (Join-Path $Destination "windows_installer_test_plan.md") -Force
+    foreach ($docName in @("installer_1_1_postmortem.md", "windows_installation_wizard_1_1_design.md")) {
+        $docPath = Join-Path $repoRoot "docs\$docName"
+        if (Test-Path $docPath) {
+            Copy-Item -LiteralPath $docPath -Destination (Join-Path $Destination $docName) -Force
+        }
+    }
     Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE.md") -Destination (Join-Path $Destination "LICENSE.md") -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "COPYING") -Destination (Join-Path $Destination "COPYING") -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $Destination "THIRD_PARTY_NOTICES.md") -Force
@@ -160,6 +167,9 @@ function Copy-BaseArtifacts {
         installer = "HyperSearch_${Version}_x64-setup.exe"
         msi = "HyperSearch_${Version}_x64_en-US.msi"
         directExe = "hypersearch-desktop.exe"
+        installationWizard = "HyperSearch Installation Wizard"
+        standardInstallChannel = "Full"
+        customInstallImageSources = @("bundled", "online", "skip")
         runtimePath = "%LOCALAPPDATA%\HyperSearch\runtime"
         installerLogPath = "%LOCALAPPDATA%\HyperSearch\logs\installer-*.log"
         installerTranscriptPath = "%LOCALAPPDATA%\HyperSearch\logs\installer-transcript-*.log"
@@ -175,19 +185,27 @@ function Copy-BaseArtifacts {
         licenseText = "COPYING"
         thirdPartyNotices = "THIRD_PARTY_NOTICES.md"
         sourceOffer = "SOURCE_OFFER.md"
+        setupProfilePath = "%LOCALAPPDATA%\HyperSearch\install-profile.json"
+        modelCatalog = [ordered]@{
+            lowResource = "google/gemma-3-1B-it-QAT"
+            standard = "qwen2.5-7b-1m"
+            highResource = "openai/gpt-oss-20b"
+        }
         signingMode = $SigningMode
         signingSummary = if ($signingSummaryPath) { "signing-summary.json" } else { "" }
         notes = @(
-            "Online media pulls prebuilt Docker images during setup.",
-            "Online media falls back to a local API/UI image build if registry access is unavailable.",
-            "Full media loads image archives from payload\\images when present.",
+            "Full media is the default public 1.1 installer channel.",
+            "Standard install uses bundled Docker images and does not require Docker Hub sign-in for HyperSearch startup.",
+            "Custom install can choose bundled, online, or skipped Docker image setup.",
             "Release license, third-party notice, and source-offer files are included at the media root.",
+            "The Installation Wizard records explicit component-license consent before passing third-party installer agreement flags.",
             "Signing metadata is included when the media build is run with a signing mode.",
-            "The NSIS setup runs the prerequisite helper and passes the installer media folder to it.",
-            "Docker Desktop installation may require Windows administrator approval.",
-            "Docker Desktop and LM Studio downloads require internet access unless their installers are supplied in payload\\prereqs.",
-            "Setup checks WSL status and runs wsl --update before Docker image setup so Docker Desktop can start its WSL backend on freshly installed systems.",
-            "LM Studio model download is asynchronous and may continue after installer completion.",
+            "The NSIS setup runs the HyperSearch Installation Wizard and passes the installer media folder to it.",
+            "Docker Desktop installation or repair may require Windows administrator approval.",
+            "Docker Desktop, WSL, and LM Studio downloads require internet access unless their installers are supplied in payload\\prereqs.",
+            "Setup checks WSL status and prefers the bundled WSL MSI when present before falling back to wsl --install or wsl --update.",
+            "LM Studio model download is optional and may be marked pending when non-interactive CLI download is unavailable.",
+            "The installer writes install-profile.json so the desktop app can import first-run provider, model, and usage settings.",
             "The desktop launcher writes full command logs under %LOCALAPPDATA%\\HyperSearch\\logs\\commands."
         )
     }
@@ -215,6 +233,12 @@ function Copy-FullPayload {
             throw "Docker Desktop installer path was not found: $DockerDesktopInstallerPath"
         }
         Copy-Item -LiteralPath $DockerDesktopInstallerPath -Destination (Join-Path $prereqPayload "Docker Desktop Installer.exe") -Force
+    }
+    if ($WslInstallerPath) {
+        if (!(Test-Path $WslInstallerPath)) {
+            throw "WSL installer path was not found: $WslInstallerPath"
+        }
+        Copy-Item -LiteralPath $WslInstallerPath -Destination (Join-Path $prereqPayload "WSL.msi") -Force
     }
     if ($LmStudioInstallerPath) {
         if (!(Test-Path $LmStudioInstallerPath)) {

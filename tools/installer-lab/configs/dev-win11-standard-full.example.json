@@ -1,0 +1,51 @@
+{
+  "labRoot": "%LOCALAPPDATA%\\HyperSearch\\installer-lab",
+  "mediaRoot": "C:\\Users\\Seeker\\source\\Workbooks\\HyperSearch\\Installation Media\\PublicRelease_1_1\\Full",
+  "installerExe": "HyperSearch_1.1.0_x64-setup.exe",
+  "guestCredentialPath": "C:\\tmp\\hypersearch-lab-credential.xml",
+  "guestUser": "HyperSearchAdmin",
+  "guestPasswordEnv": "HYPERSEARCH_LAB_GUEST_PASSWORD",
+  "guestWorkRoot": "C:\\HyperSearchInstallerLab",
+  "defaultExpectedResults": ["passed", "warning"],
+  "defaultGuestTimeoutSeconds": 3600,
+  "defaultVmReadyTimeoutSeconds": 900,
+  "defaultProgressPollSeconds": 30,
+  "defaultNoProgressPollLimit": 8,
+  "scenarios": [
+    {
+      "name": "win11-fresh-standard-full",
+      "vmName": "HyperSearchLab-Win11-24H2",
+      "checkpoint": "clean-windows-docker-supported-ready",
+      "executionMode": "core",
+      "requireNestedVirtualization": true,
+      "installerTimeoutSeconds": 3600,
+      "resumeTimeoutSeconds": 2400,
+      "progressPollSeconds": 30,
+      "noProgressPollLimit": 8,
+      "allowRebootResume": true,
+      "description": "Fast dev loop for the Windows 11 Standard Full installer path.",
+      "automation": {
+        "acceptedLicenses": true,
+        "installMode": "standard",
+        "installDocker": true,
+        "dockerInstallMode": "per-user",
+        "repairDocker": true,
+        "dockerReadyTimeoutSeconds": 240,
+        "installLmStudio": true,
+        "imageSource": "bundled",
+        "startStack": true,
+        "usagePreset": "general-research",
+        "selectedModel": "recommended",
+        "downloadModel": false
+      },
+      "assertions": {
+        "requireDockerReady": true,
+        "requireImagesVerified": true,
+        "requireStackReady": true,
+        "requireNoComposeEnvBom": true,
+        "requireLmStudioPendingDisablesLlm": true,
+        "forbidInvalidModelId": true
+      }
+    }
+  ]
+}

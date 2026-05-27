@@ -2,7 +2,7 @@
 param(
     [ValidateSet("Verify", "SelfSigned", "CertStore")]
     [string]$Mode = "Verify",
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.1.0",
     [string]$PublisherName = "Robert Choudury",
     [string]$AppName = "HyperSearch",
     [string[]]$ArtifactPath = @(),

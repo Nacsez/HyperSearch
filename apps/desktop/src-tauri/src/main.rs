@@ -71,6 +71,44 @@ struct PersistedWindowState {
     maximized: bool,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallProfileJson {
+    provider: Option<InstallProfileProvider>,
+    usage_preset: Option<String>,
+    selected_components: Option<InstallProfileComponents>,
+    setup: Option<InstallProfileSetup>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallProfileProvider {
+    name: Option<String>,
+    base_url: Option<String>,
+    model_id: Option<String>,
+    llm_enabled: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallProfileComponents {
+    docker: Option<bool>,
+    lm_studio: Option<bool>,
+    docker_images: Option<String>,
+    start_stack: Option<bool>,
+    model_download: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallProfileSetup {
+    result: Option<String>,
+    run_id: Option<String>,
+    log_path: Option<String>,
+    summary_path: Option<String>,
+    command_log_dir: Option<String>,
+}
+
 const MIN_MAIN_WINDOW_WIDTH: u32 = 1100;
 const MIN_MAIN_WINDOW_HEIGHT: u32 = 720;
 
@@ -276,10 +314,7 @@ fn log_desktop_event(event: &str, detail: impl AsRef<str>) {
         let _ = writeln!(
             file,
             "[{}] [{}] [{}] {}",
-            iso_timestamp,
-            unix_millis,
-            event,
-            redacted_detail
+            iso_timestamp, unix_millis, event, redacted_detail
         );
     }
 }
@@ -343,7 +378,7 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         } else {
             fs::write(
                 &root_env,
-                "HYPERSEARCH_ENV=production\nHYPERSEARCH_LAN_ENABLED=false\nHYPERSEARCH_LLM_ENABLED=true\nHYPERSEARCH_PROVIDER_DEFAULT=lmstudio\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_LMSTUDIO_MODEL=qwen2.5-7b-instruct\nCOMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_IMAGE_SOURCE=online\n",
+                "HYPERSEARCH_ENV=production\nHYPERSEARCH_LAN_ENABLED=false\nHYPERSEARCH_LLM_ENABLED=true\nHYPERSEARCH_PROVIDER_DEFAULT=lmstudio\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_LMSTUDIO_MODEL=qwen2.5-7b-1m\nCOMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.1.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.1.0\nHYPERSEARCH_IMAGE_SOURCE=online\n",
             )
             .map_err(|error| error.to_string())?;
             log_desktop_event("runtime.env.create", "created .env from built-in defaults");
@@ -362,7 +397,7 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
         }
         fs::write(
             &compose_env,
-            "COMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_BIND_HOST=127.0.0.1\nHYPERSEARCH_HTTP_PORT=8090\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.0.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.0.0\nHYPERSEARCH_CADDY_IMAGE=caddy:2.11.2-alpine\nHYPERSEARCH_VALKEY_IMAGE=valkey/valkey:8.1.6-alpine\nHYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:2026.4.13-ee66b070a\n",
+            "COMPOSE_PROJECT_NAME=hypersearch\nHYPERSEARCH_BIND_HOST=127.0.0.1\nHYPERSEARCH_HTTP_PORT=8090\nHYPERSEARCH_LMSTUDIO_BASE_URL=http://host.docker.internal:1234\nHYPERSEARCH_API_IMAGE=ghcr.io/nacsez/hypersearch-api:1.1.0\nHYPERSEARCH_UI_IMAGE=ghcr.io/nacsez/hypersearch-ui:1.1.0\nHYPERSEARCH_CADDY_IMAGE=caddy:2.11.2-alpine\nHYPERSEARCH_VALKEY_IMAGE=valkey/valkey:8.1.6-alpine\nHYPERSEARCH_SEARXNG_IMAGE=searxng/searxng:2026.4.13-ee66b070a\n",
         )
         .map_err(|error| error.to_string())?;
         log_desktop_event(
@@ -382,25 +417,29 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
     set_env_default(
         &root_env,
         "HYPERSEARCH_API_IMAGE",
-        "ghcr.io/nacsez/hypersearch-api:1.0.0",
+        "ghcr.io/nacsez/hypersearch-api:1.1.0",
     )?;
     set_env_default(
         &root_env,
         "HYPERSEARCH_UI_IMAGE",
-        "ghcr.io/nacsez/hypersearch-ui:1.0.0",
+        "ghcr.io/nacsez/hypersearch-ui:1.1.0",
     )?;
     set_env_value(&compose_env, "COMPOSE_PROJECT_NAME", "hypersearch")?;
     set_env_default(
         &compose_env,
         "HYPERSEARCH_API_IMAGE",
-        "ghcr.io/nacsez/hypersearch-api:1.0.0",
+        "ghcr.io/nacsez/hypersearch-api:1.1.0",
     )?;
     set_env_default(
         &compose_env,
         "HYPERSEARCH_UI_IMAGE",
-        "ghcr.io/nacsez/hypersearch-ui:1.0.0",
+        "ghcr.io/nacsez/hypersearch-ui:1.1.0",
     )?;
-    set_env_value(&compose_env, "HYPERSEARCH_CADDY_IMAGE", "caddy:2.11.2-alpine")?;
+    set_env_value(
+        &compose_env,
+        "HYPERSEARCH_CADDY_IMAGE",
+        "caddy:2.11.2-alpine",
+    )?;
     set_env_value(
         &compose_env,
         "HYPERSEARCH_VALKEY_IMAGE",
@@ -415,17 +454,173 @@ fn ensure_runtime_env_files(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn apply_install_profile(root: &Path) -> Result<(), String> {
+fn apply_install_profile_json(root: &Path) -> Result<bool, String> {
+    let profile_path = hypersearch_data_root()?.join("install-profile.json");
+    if !profile_path.exists() {
+        log_desktop_event(
+            "install_profile.json.skip",
+            "install-profile.json was not present",
+        );
+        return Ok(false);
+    }
+    log_desktop_event(
+        "install_profile.json.apply.start",
+        format!("path={}", profile_path.display()),
+    );
+    let contents = fs::read_to_string(&profile_path).map_err(|error| error.to_string())?;
+    let profile = serde_json::from_str::<InstallProfileJson>(&contents)
+        .map_err(|error| format!("failed to parse {}: {}", profile_path.display(), error))?;
+    let root_env = root.join(".env");
+    let compose_env = root.join("infra").join("docker").join(".env");
+
+    if let Some(provider) = profile.provider {
+        if let Some(name) = provider
+            .name
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_PROVIDER_DEFAULT", name.trim())?;
+        }
+        if let Some(base_url) = provider
+            .base_url
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_LMSTUDIO_BASE_URL", base_url.trim())?;
+            set_env_value(
+                &compose_env,
+                "HYPERSEARCH_LMSTUDIO_BASE_URL",
+                base_url.trim(),
+            )?;
+        }
+        if let Some(model_id) = provider.model_id.as_deref() {
+            set_env_value(&root_env, "HYPERSEARCH_LMSTUDIO_MODEL", model_id.trim())?;
+        }
+        if let Some(llm_enabled) = provider.llm_enabled {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_LLM_ENABLED",
+                if llm_enabled { "true" } else { "false" },
+            )?;
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_RESEARCH_CAPABILITY",
+                if llm_enabled { "" } else { "search-only" },
+            )?;
+        }
+    }
+
+    if let Some(usage_preset) = profile
+        .usage_preset
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        set_env_value(
+            &root_env,
+            "HYPERSEARCH_INSTALL_USAGE_PRESET",
+            usage_preset.trim(),
+        )?;
+    }
+    if let Some(components) = profile.selected_components {
+        if let Some(docker_images) = components
+            .docker_images
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_IMAGE_SOURCE", docker_images.trim())?;
+        }
+        if let Some(value) = components.docker {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_DOCKER_SELECTED",
+                &value.to_string(),
+            )?;
+        }
+        if let Some(value) = components.lm_studio {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_LMSTUDIO_SELECTED",
+                &value.to_string(),
+            )?;
+        }
+        if let Some(value) = components.start_stack {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_START_STACK_SELECTED",
+                &value.to_string(),
+            )?;
+        }
+        if let Some(value) = components.model_download {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_MODEL_DOWNLOAD_SELECTED",
+                &value.to_string(),
+            )?;
+        }
+    }
+    if let Some(setup) = profile.setup {
+        if let Some(result) = setup
+            .result
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_INSTALL_RESULT", result.trim())?;
+        }
+        if let Some(run_id) = setup
+            .run_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_INSTALL_RUN_ID", run_id.trim())?;
+        }
+        if let Some(log_path) = setup
+            .log_path
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(&root_env, "HYPERSEARCH_INSTALL_LOG_PATH", log_path.trim())?;
+        }
+        if let Some(summary_path) = setup
+            .summary_path
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_SUMMARY_PATH",
+                summary_path.trim(),
+            )?;
+        }
+        if let Some(command_log_dir) = setup
+            .command_log_dir
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            set_env_value(
+                &root_env,
+                "HYPERSEARCH_INSTALL_COMMAND_LOG_DIR",
+                command_log_dir.trim(),
+            )?;
+        }
+    }
+    log_desktop_event(
+        "install_profile.json.apply.complete",
+        "provider profile applied",
+    );
+    Ok(true)
+}
+
+fn apply_install_profile_env(root: &Path) -> Result<bool, String> {
     let profile_path = hypersearch_data_root()?.join("install-profile.env");
     if !profile_path.exists() {
         log_desktop_event(
-            "install_profile.skip",
+            "install_profile.env.skip",
             "install-profile.env was not present",
         );
-        return Ok(());
+        return Ok(false);
     }
     log_desktop_event(
-        "install_profile.apply.start",
+        "install_profile.env.apply.start",
         format!("path={}", profile_path.display()),
     );
     let contents = fs::read_to_string(&profile_path).map_err(|error| error.to_string())?;
@@ -441,7 +636,15 @@ fn apply_install_profile(root: &Path) -> Result<(), String> {
         match name {
             "HYPERSEARCH_LMSTUDIO_MODEL"
             | "HYPERSEARCH_LMSTUDIO_BASE_URL"
-            | "HYPERSEARCH_PROVIDER_DEFAULT" => {
+            | "HYPERSEARCH_PROVIDER_DEFAULT"
+            | "HYPERSEARCH_LLM_ENABLED"
+            | "HYPERSEARCH_RESEARCH_CAPABILITY"
+            | "HYPERSEARCH_INSTALL_USAGE_PRESET"
+            | "HYPERSEARCH_INSTALL_RESULT"
+            | "HYPERSEARCH_INSTALL_RUN_ID"
+            | "HYPERSEARCH_INSTALL_LOG_PATH"
+            | "HYPERSEARCH_INSTALL_SUMMARY_PATH"
+            | "HYPERSEARCH_INSTALL_COMMAND_LOG_DIR" => {
                 set_env_value(&root.join(".env"), name, value)?;
             }
             "HYPERSEARCH_COMPOSE_LMSTUDIO_BASE_URL" => {
@@ -454,7 +657,19 @@ fn apply_install_profile(root: &Path) -> Result<(), String> {
             _ => {}
         }
     }
-    log_desktop_event("install_profile.apply.complete", "provider profile applied");
+    log_desktop_event(
+        "install_profile.env.apply.complete",
+        "provider profile applied",
+    );
+    Ok(true)
+}
+
+fn apply_install_profile(root: &Path) -> Result<(), String> {
+    let applied_json = apply_install_profile_json(root)?;
+    let applied_env = apply_install_profile_env(root)?;
+    if !applied_json && !applied_env {
+        log_desktop_event("install_profile.skip", "no install profile was present");
+    }
     Ok(())
 }
 
@@ -583,7 +798,9 @@ fn run_command(mut command: Command) -> Result<String, String> {
                 truncate_log(&redacted_stderr, 1600)
             ),
         );
-        return Err(format!("{}\n{}", redacted_stdout, redacted_stderr).trim().to_string());
+        return Err(format!("{}\n{}", redacted_stdout, redacted_stderr)
+            .trim()
+            .to_string());
     }
     let redacted_stdout = redact_sensitive_text(&stdout);
     let redacted_stderr = redact_sensitive_text(&stderr);
@@ -599,7 +816,9 @@ fn run_command(mut command: Command) -> Result<String, String> {
             truncate_log(&redacted_stderr, 1200)
         ),
     );
-    Ok(format!("{}\n{}", redacted_stdout, redacted_stderr).trim().to_string())
+    Ok(format!("{}\n{}", redacted_stdout, redacted_stderr)
+        .trim()
+        .to_string())
 }
 
 fn run_docker(root: &Path, args: &[&str]) -> Result<String, String> {
@@ -957,7 +1176,14 @@ fn read_env_value(path: &Path, name: &str, default_value: &str) -> String {
 }
 
 fn set_env_value(path: &Path, name: &str, value: &str) -> Result<(), String> {
-    let contents = fs::read_to_string(path).unwrap_or_default();
+    let mut contents = fs::read_to_string(path).unwrap_or_default();
+    if contents.starts_with('\u{feff}') {
+        contents = contents.trim_start_matches('\u{feff}').to_string();
+        log_desktop_event(
+            "env.rewrite.strip_bom",
+            format!("removed UTF-8 BOM from {}", path.display()),
+        );
+    }
     let mut found = false;
     let mut lines = Vec::new();
     for line in contents.lines() {
@@ -1081,7 +1307,11 @@ fn redact_key_value_line(line: &str) -> Option<String> {
         return None;
     }
     let separator_char = right.chars().next().unwrap_or('=');
-    let suffix = if line.trim_end().ends_with(',') { "," } else { "" };
+    let suffix = if line.trim_end().ends_with(',') {
+        ","
+    } else {
+        ""
+    };
     Some(format!("{left}{separator_char}<redacted>{suffix}"))
 }
 
@@ -1164,13 +1394,15 @@ fn copy_diagnostics_tree(source: &Path, target: &Path) -> Result<(), String> {
                 .and_then(OsStr::to_str)
                 .unwrap_or_default()
                 .to_ascii_lowercase();
-            if matches!(extension.as_str(), "log" | "txt" | "json" | "env" | "yaml" | "yml") {
+            if matches!(
+                extension.as_str(),
+                "log" | "txt" | "json" | "env" | "yaml" | "yml"
+            ) {
                 match fs::read_to_string(&source_path) {
                     Ok(contents) => fs::write(&target_path, redact_sensitive_text(&contents))
                         .map_err(|error| error.to_string())?,
                     Err(_) => {
-                        fs::copy(&source_path, &target_path)
-                            .map_err(|error| error.to_string())?;
+                        fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
                     }
                 }
             } else {
@@ -1215,6 +1447,21 @@ fn export_diagnostics_sync() -> Result<String, String> {
             redact_env_contents(&contents),
         )
         .map_err(|error| error.to_string())?;
+    }
+    for (source, target_name) in [
+        (
+            data_root.join("install-profile.json"),
+            "install-profile.redacted.json",
+        ),
+        (
+            data_root.join("install-profile.env"),
+            "install-profile-env.redacted.txt",
+        ),
+    ] {
+        if let Ok(contents) = fs::read_to_string(&source) {
+            fs::write(target.join(target_name), redact_sensitive_text(&contents))
+                .map_err(|error| error.to_string())?;
+        }
     }
 
     write_diagnostics_command(
@@ -1353,6 +1600,30 @@ fn backend_action_sync(action: String) -> Result<String, String> {
     }
 }
 
+fn should_login_autostart_backend() -> bool {
+    env::args().any(|arg| arg == "--hypersearch-autostart")
+}
+
+fn spawn_login_autostart_backend() {
+    log_desktop_event(
+        "login_autostart.backend.spawn",
+        "starting backend after Windows sign-in launch",
+    );
+    std::thread::spawn(|| {
+        sleep(Duration::from_secs(2));
+        match backend_action_sync("up".to_string()) {
+            Ok(output) => log_desktop_event(
+                "login_autostart.backend.complete",
+                truncate_log(&output, 1200),
+            ),
+            Err(error) => log_desktop_event(
+                "login_autostart.backend.error",
+                truncate_log(&error, 1200),
+            ),
+        }
+    });
+}
+
 fn backend_logs_sync() -> Result<String, String> {
     log_desktop_event("backend.logs.start", "docker compose logs requested");
     let result = run_compose(&["logs", "--tail", "160"]);
@@ -1395,8 +1666,9 @@ fn parse_compose_ps_json(output: &str) -> Result<Vec<ComposeServiceState>, Strin
         let mut items = Vec::new();
         for line in trimmed.lines().filter(|line| !line.trim().is_empty()) {
             items.push(
-                serde_json::from_str::<serde_json::Value>(line)
-                    .map_err(|error| format!("Unable to parse docker compose ps JSON line: {error}; line={line}"))?,
+                serde_json::from_str::<serde_json::Value>(line).map_err(|error| {
+                    format!("Unable to parse docker compose ps JSON line: {error}; line={line}")
+                })?,
             );
         }
         items
@@ -1416,7 +1688,9 @@ fn compose_services_report(services: &[ComposeServiceState]) -> (bool, String) {
     let mut ok = true;
     let mut lines = Vec::new();
     for service_name in required {
-        let Some(service) = services.iter().find(|item| item.service == service_name || item.service.ends_with(&format!("-{service_name}-1"))) else {
+        let Some(service) = services.iter().find(|item| {
+            item.service == service_name || item.service.ends_with(&format!("-{service_name}-1"))
+        }) else {
             ok = false;
             lines.push(format!("{service_name}: missing"));
             continue;
@@ -1431,8 +1705,16 @@ fn compose_services_report(services: &[ComposeServiceState]) -> (bool, String) {
         lines.push(format!(
             "{}: state={} health={}",
             service_name,
-            if service.state.is_empty() { "unknown" } else { &service.state },
-            if service.health.is_empty() { "not-declared" } else { &service.health }
+            if service.state.is_empty() {
+                "unknown"
+            } else {
+                &service.state
+            },
+            if service.health.is_empty() {
+                "not-declared"
+            } else {
+                &service.health
+            }
         ));
     }
     (ok, lines.join("\n"))
@@ -1763,6 +2045,9 @@ fn main() {
                 eprintln!("HyperSearch runtime setup failed: {error}");
             } else {
                 log_desktop_event("app.setup.complete", "runtime stack prepared");
+                if should_login_autostart_backend() {
+                    spawn_login_autostart_backend();
+                }
             }
             if let Some(window) = app.get_webview_window("main") {
                 restore_main_window_state(&window);

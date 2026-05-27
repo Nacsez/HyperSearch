@@ -1,0 +1,13 @@
+{
+  "acceptedLicenses": true,
+  "installMode": "standard",
+  "installDocker": true,
+  "dockerInstallMode": "per-user",
+  "repairDocker": true,
+  "installLmStudio": true,
+  "imageSource": "bundled",
+  "startStack": true,
+  "usagePreset": "general-research",
+  "selectedModel": "recommended",
+  "downloadModel": false
+}
