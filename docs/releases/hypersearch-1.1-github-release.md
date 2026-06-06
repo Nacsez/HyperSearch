@@ -4,7 +4,7 @@ HyperSearch 1.1 is the installer reliability release for the local-first Windows
 
 ## Recommended Download
 
-Use **Full Installation Media** for the 1.1 release candidate and public release. It includes the HyperSearch desktop installer, bundled container image archive, installer prerequisites, and release metadata needed for the Standard setup path.
+Use **Full Installation Media** for the 1.1 public release. It includes the HyperSearch desktop installer, bundled container image archive, installer prerequisites, and release metadata needed for the Standard setup path.
 
 This release still uses unsigned Windows binaries. Verify the ZIP and installer hashes before running the installer. Windows SmartScreen may warn on first launch because the binaries are not Authenticode-signed.
 
@@ -12,9 +12,11 @@ This release still uses unsigned Windows binaries. Verify the ZIP and installer 
 
 | Asset | Use this when | SHA256 |
 | --- | --- | --- |
-| `HyperSearch_1.1.0_Full_<release>.zip` | You want the supported first-install path with bundled images and prerequisites. | Add final release ZIP hash here. |
-| `HyperSearch_1.1.0_x64-setup.exe` | You only need the Windows installer from inside the media package. | See the included `checksums.sha256`. |
-| `hypersearch-images-1.1.0.tar` | You need to verify the bundled Docker image archive inside the Full media. | `70a2d77b652bde5bc95ce343468be41be363e5d5b8413eeb22369dbc37aea73c` |
+| `HyperSearch_1.1.0_Full_20260606.zip` | You want the supported first-install path with bundled images and prerequisites. | `48893ec80265f087c4058f0baa6776620941a52d0dba8530a7dc1a6c8cc7c443` |
+| `HyperSearch_1.1.0_x64-setup.exe` | You only need the Windows installer from inside the media package. | `e20e1b15a844b71db94b3f54ba2f12ff5a660ca6490bc4a15cf74dd7a0c22a93` |
+| `HyperSearch_1.1.0_x64_en-US.msi` | You need the generated MSI from inside the media package. | `486130444093c7716321638e4fc39b01336c7c46768173e5ee050350e488dc48` |
+| `hypersearch-desktop.exe` | You need to verify the direct desktop executable inside the media package. | `598506d78c74b017f4cadd9a46fe6992dcecf9cbe1e948b035b58b10401dfff8` |
+| `hypersearch-images-1.1.0.tar` | You need to verify the bundled Docker image archive inside the Full media. | `70fdfbcd2b89f33280ba9710a56b102ca4a1962a358487a008a825632f70c1b5` |
 
 ## What Changed
 
@@ -35,7 +37,9 @@ Final release-gate run:
 - Result: `passed`
 - Matrix: `9/9` scenarios passed, `0` failed
 - Full media source: `Installation Media\RC_20260526_1_1_win10fix\Full`
-- Image archive SHA256: `70a2d77b652bde5bc95ce343468be41be363e5d5b8413eeb22369dbc37aea73c`
+- Final public media source: `Installation Media\PublicRelease_20260606_1_1\Full`
+- Final public media ZIP: `Installation Media\PublicRelease_20260606_1_1\HyperSearch_1.1.0_Full_20260606.zip`
+- Image archive SHA256: `70fdfbcd2b89f33280ba9710a56b102ca4a1962a358487a008a825632f70c1b5`
 
 Validated scenarios:
 
@@ -54,8 +58,13 @@ Strict Standard Full acceptance passed with zero installer warnings, Docker Desk
 Local preflight checks passed:
 
 - `pytest`: `33 passed, 1 skipped`
-- Installer parser/unit gate: passed
-- Docker Compose config: passed
+- UI production build: passed
+- Desktop frontend build: passed
+- Desktop native `cargo check`: passed
+- Installer parser/unit gate: passed as part of full `pytest`
+- Docker Compose config and release+dev override config: passed
+- Release security check: license notices current, npm audits reported `0` vulnerabilities
+- Final media ZIP integrity probe: 18 entries, setup/MSI/image archive/prerequisites present
 
 ## First Run
 
@@ -74,7 +83,7 @@ Some Windows systems must restart after WSL is installed or updated before Docke
 PowerShell example:
 
 ```powershell
-Get-FileHash .\HyperSearch_1.1.0_Full_<release>.zip -Algorithm SHA256
+Get-FileHash .\HyperSearch_1.1.0_Full_20260606.zip -Algorithm SHA256
 ```
 
 Compare the result with the SHA256 value on the release page. After extraction, compare individual file hashes with the included `checksums.sha256`.

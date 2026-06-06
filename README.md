@@ -1,6 +1,6 @@
 # HyperSearch
 
-HyperSearch is a local-control search and research service for people who want their own searchable history, local caching, and local-model synthesis without depending on a cloud model provider. The 1.1 target is Windows-first, desktop-launched, localhost by default, and LAN-capable only through an explicit pairing-token flow.
+HyperSearch is a local-control search and research service for people who want their own searchable history, local caching, and local-model synthesis without depending on a cloud model provider. HyperSearch 1.1 is Windows-first, desktop-launched, localhost by default, and LAN-capable only through an explicit pairing-token flow.
 
 ## What is included
 
@@ -31,18 +31,18 @@ may still require internet access when they need to be installed or updated.
 Search-only mode is a supported success state; LM Studio and model download are
 optional.
 
-The Online media ZIP is smaller and uses the public GHCR images:
+The Online media path is smaller and uses the public GHCR images when explicitly selected in Custom setup:
 
-- `ghcr.io/nacsez/hypersearch-api:1.0.0`
-- `ghcr.io/nacsez/hypersearch-ui:1.0.0`
+- `ghcr.io/nacsez/hypersearch-api:1.1.0`
+- `ghcr.io/nacsez/hypersearch-ui:1.1.0`
 
 Use Online media when the target computer has reliable internet and registry
 access. Use Full media for normal end users, clean machines, and offline-prone
 systems.
 
-## 1.0 Local-Control Position
+## 1.1 Local-Control Position
 
-- No external/cloud model API keys are supported for 1.0.
+- No external/cloud model API keys are supported for 1.1.
 - Search-only is a supported installation mode. Research synthesis uses a local OpenAI-compatible provider such as LM Studio, local vLLM, or local llama.cpp when one is enabled and ready.
 - The app-level LLM toggle is stored locally. `HYPERSEARCH_LLM_ENABLED=false` or `HYPERSEARCH_RESEARCH_CAPABILITY=search-only` starts HyperSearch in search-only mode.
 - Browser/API access binds to localhost by default.
@@ -112,7 +112,7 @@ The deploy helper wraps the Docker Compose stack in `infra/docker`, uses an isol
 ### Release Media
 
 ```powershell
-.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_1_1 -Channel Full -Version 1.1.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
+.\scripts\Build-InstallationMedia.ps1 -RunName PublicRelease_20260606_1_1 -Channel Full -Version 1.1.0 -RegistryMode GHCR -BuildImages -SigningMode Verify
 ```
 
 The generated media supports:

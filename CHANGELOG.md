@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 - 2026-06-06
+
+- Added the HyperSearch Installation Wizard for Standard and Custom Windows setup.
+- Added Full media support for bundled Docker image archives, digest manifests, Docker Desktop, WSL, and LM Studio prerequisite payloads.
+- Hardened WSL, Docker Desktop, Docker Compose, bundled image verification, and LM Studio setup handling with structured installer state, command logs, diagnostics, and reboot/resume decisions.
+- Added strict Hyper-V release-gate coverage for Windows 10 22H2 and Windows 11 23H2+ Full media, including Standard Full, NSIS Standard Full, search-only, and Compose `.env` BOM regression lanes.
+- Added optional Windows sign-in autostart registration for the desktop launcher.
+- Preserved the unsigned, SHA256-verifiable release posture and generated final 1.1 Full media hashes for GitHub Releases.
+
 ## 1.0.0 - 2026-05-09
 
 - Repositioned HyperSearch as a local-control personal search and research app.
